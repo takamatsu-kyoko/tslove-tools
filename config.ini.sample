@@ -1,0 +1,17 @@
+[DEFAULT]
+username = T's Love のユーザ名(メールアドレス)を記載してください
+password = T's Love のパスワードを記載してください
+#phpsessid = phpsessidはプログラムが自動的に記述します。手動では作成しないでください
+
+[imechen]
+imagefiles = 画像ファイルをフルパスで指定しますワイルドカードが使用できます
+
+
+
+## 作成例
+[DEFAULT]
+username = someone@example.com
+password = hogehoge
+
+[imechen]
+imagefiles = /home/someone/path/to/images/*.JPG
