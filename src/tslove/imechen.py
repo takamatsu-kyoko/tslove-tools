@@ -1,4 +1,3 @@
-#! /usr/bin/env python3
 """
 Ts'LOVE のプロフィール写真を差し替えます
 """
