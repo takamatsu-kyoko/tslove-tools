@@ -1,6 +1,7 @@
 from bs4 import BeautifulSoup
 import getpass
 import re
+import os
 import time
 
 import tslove.web
@@ -76,10 +77,11 @@ def collect_contents(soup):
     return contents
 
 
-def output_diary(diary_id, contents, soup):
+def output_diary(diary_id, contents, soup, output_path='.'):
     print('date: {} title: {}'.format(contents['date'], contents['title']))
 
-    with open('{}.html'.format(diary_id), 'w') as f:
+    file_name = os.path.join(output_path, '{}.html'.format(diary_id))
+    with open(file_name, 'w') as f:
         f.write(soup.prettify(formatter=None))
 
 
