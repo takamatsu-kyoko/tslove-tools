@@ -7,6 +7,7 @@ import time
 import tslove.web
 
 DIARY_ID_PATTERN = re.compile(r'\./\?m=pc&a=page_fh_diary&target_c_diary_id=(?P<id>[0-9]+)')
+URL_PATTERN = re.compile(r'url\((?P<path>.+)\)')
 
 
 def main():
@@ -30,6 +31,15 @@ def main():
 
     if login is False:
         print('Login failed.')
+        exit(1)
+
+    try:
+        stylesheet = web.get_stylesheet()
+        image_paths = collect_stylesheet_image_paths(stylesheet)
+        fetch_stylesheet_images(web, image_paths, output_path='./stylesheet')
+        output_stylesheet(stylesheet, output_path='./stylesheet')
+    except Exception as e:
+        print('Can not get stylesheet. {}'.format(e))
         exit(1)
 
     if diary_id is None:
@@ -75,6 +85,58 @@ def collect_contents(soup):
         contents['prev_diary_id'] = None
 
     return contents
+
+
+def collect_stylesheet_image_paths(stylesheet):
+    paths = set()
+    for line in stylesheet.splitlines():
+        result = URL_PATTERN.search(line)
+        if result:
+            paths.add(result.group('path'))
+
+    return paths
+
+
+def fetch_stylesheet_images(web, image_paths, output_path='.', overwrite=False):
+    exclude_path = ['./skin/default/img/marker.gif']
+
+    for path in image_paths:
+        if path in exclude_path:
+            continue
+
+        filename = os.path.join(output_path, convert_stylesheet_image_path_to_filename(path))
+        if os.path.exists(filename) and overwrite is False:
+            continue
+
+        try:
+            image = web.get_image(path)
+            image.save(filename)
+        except Exception as e:
+            print('Can not get stylesheets image {}. {}'.format(path, e))
+            continue
+
+
+def convert_stylesheet_image_path_to_filename(path):
+    pattern = re.compile(r'image_filename=(?P<filename>.+)&*')
+    result = pattern.search(path)
+    if result:
+        filename = result.group('filename')
+    else:
+        filename = os.path.basename(path)
+
+    return filename
+
+
+def output_stylesheet(stylesheet, output_path='.'):
+    file_name = os.path.join(output_path, 'tslove.css')
+    with open(file_name, 'w') as f:
+        for line in stylesheet.splitlines():
+            result = URL_PATTERN.search(line)
+            if result:
+                old_path = result.group('path')
+                new_path = './' + convert_stylesheet_image_path_to_filename(old_path)
+                line = line.replace(old_path, new_path)
+            f.write(line + '\n')
 
 
 def output_diary(diary_id, contents, soup, output_path='.'):

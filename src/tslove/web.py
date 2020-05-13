@@ -1,5 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
+from PIL import Image
+import io
 import warnings
 import time
 import re
@@ -8,8 +10,8 @@ warnings.filterwarnings('ignore', 'Unverified HTTPS request is being made.')
 
 
 class WebUI:
-    def __init__(self):
-        self.url = 'https://tslove.net'
+    def __init__(self, url='https://tslove.net/'):
+        self.url = url
         self._retry_count = 10
         self._retry_interval = 10
         self._cookies = {}
@@ -83,6 +85,44 @@ class WebUI:
                 continue
 
             return response.text
+
+        else:
+            raise RuntimeError('retry counter expiered')
+
+    def get_stylesheet(self):
+        for count in range(self._retry_count, 0, -1):
+            if count != self._retry_count:
+                time.sleep(self._retry_interval)
+
+            response = requests.get(self.url + 'xhtml_style.php', cookies=self._cookies, verify=False)
+            response.raise_for_status()
+
+            response.encoding = response.apparent_encoding
+
+            title_pattern = re.compile(r'<title>(?P<title>.+)</title>')
+            result = title_pattern.search(response.text)
+            if result and result.group('title') == 'ページが表示できませんでした':
+                print('Retry get stylesheet after {} sec.'.format(self._retry_interval))
+                continue
+
+            return response.text
+
+        else:
+            raise RuntimeError('retry counter expiered')
+
+    def get_image(self, path):
+        for count in range(self._retry_count, 0, -1):
+            if count != self._retry_count:
+                time.sleep(self._retry_interval)
+
+            response = requests.get(self.url + path, cookies=self._cookies, verify=False)
+            response.raise_for_status()
+
+            if not response.headers['Content-Type'].startswith('image/'):
+                print('Retry get image({}) after {} sec.'.format(path, self._retry_interval))
+                continue
+
+            return Image.open(io.BytesIO(response.content))
 
         else:
             raise RuntimeError('retry counter expiered')
