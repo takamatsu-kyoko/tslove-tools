@@ -11,9 +11,12 @@ URL_PATTERN = re.compile(r'url\((?P<path>.+)\)')
 
 
 def main():
-    web = tslove.web.WebUI()
+    web = tslove.web.WebUI(url='https://tslove.net/')
     php_session_id = None
     diary_id = None
+    output_path = os.path.join('.', 'dump')
+    stylesheet_output_path = os.path.join(output_path, 'stylesheet')
+    image_output_path = os.path.join(output_path, 'images')
 
     login = False
     try:
@@ -33,11 +36,20 @@ def main():
         print('Login failed.')
         exit(1)
 
+    directories = [output_path, stylesheet_output_path, image_output_path]
+    for directory in directories:
+        try:
+            if not os.path.exists(directory):
+                os.mkdir(directory)
+        except Exception as e:
+            print('Can not create directory {}. {}'.format(directory, e))
+            exit(1)
+
     try:
         stylesheet = web.get_stylesheet()
         image_paths = collect_stylesheet_image_paths(stylesheet)
-        fetch_stylesheet_images(web, image_paths, output_path='./stylesheet')
-        output_stylesheet(stylesheet, output_path='./stylesheet')
+        fetch_stylesheet_images(web, image_paths, output_path=stylesheet_output_path)
+        output_stylesheet(stylesheet, output_path=stylesheet_output_path)
     except Exception as e:
         print('Can not get stylesheet. {}'.format(e))
         exit(1)
@@ -59,7 +71,7 @@ def main():
         try:
             diary_page = BeautifulSoup(web.get_diary_page(diary_id), 'html.parser')
             contents = collect_contents(diary_page)
-            output_diary(diary_id, contents, diary_page)
+            output_diary(diary_id, contents, diary_page, output_path=output_path)
         except Exception as e:
             print('Processing diary id {} failed. {}'.format(diary_id, e))
             exit(1)
