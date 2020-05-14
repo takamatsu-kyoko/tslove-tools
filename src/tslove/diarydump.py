@@ -4,6 +4,7 @@ import getpass
 import re
 import os
 import time
+import datetime
 
 import tslove.web
 
@@ -18,6 +19,8 @@ def main():
     output_path = os.path.join('.', 'dump')
     stylesheet_output_path = os.path.join(output_path, 'stylesheet')
     image_output_path = os.path.join(output_path, 'images')
+
+    page_info = []
 
     login = False
     try:
@@ -67,11 +70,13 @@ def main():
 
     contents = None
     while diary_id:
-        if contents:
-            time.sleep(5)
         try:
+            if contents:
+                time.sleep(5)
+
             diary_page = BeautifulSoup(web.get_diary_page(diary_id), 'html.parser')
             contents = collect_contents(diary_page)
+            contents['diary_id'] = diary_id
 
             image_paths = collect_image_paths(diary_page)
             fetch_images(web, image_paths, output_path=image_output_path)
@@ -81,20 +86,27 @@ def main():
             fix_link(diary_page, output_path=output_path)
 
             output_diary(diary_id, contents, diary_page, output_path=output_path)
+
+            page_info.append(contents)
         except Exception as e:
             print('Processing diary id {} failed. {}'.format(diary_id, e))
             exit(1)
+        except KeyboardInterrupt:
+            break
 
-        print('diary id {} processed.'.format(diary_id))
+        print('diary id {} ({}) processed.'.format(diary_id, contents['title']))
         diary_id = contents['prev_diary_id']
 
+    output_index(page_info, output_path=output_path)
     print('done.')
 
 
 def collect_contents(soup):
     contents = {}
-    contents['title'] = soup.find('p', class_='heading').string
-    contents['date'] = soup.find('div', class_='dparts diaryDetailBox').div.dl.dt.get_text()
+    contents['title'] = str(soup.find('p', class_='heading').string)
+
+    date = str(soup.find('div', class_='dparts diaryDetailBox').div.dl.dt.get_text())
+    contents['date'] = datetime.datetime.strptime(date, '%Y年%m月%d日%H:%M')
 
     result = soup.find('p', class_='prev')
     if result:
@@ -283,9 +295,44 @@ def fix_link(soup, output_path='.'):
 
 
 def output_diary(diary_id, contents, soup, output_path='.'):
-    print('date: {} title: {}'.format(contents['date'], contents['title']))
-
     file_name = os.path.join(output_path, '{}.html'.format(diary_id))
+    with open(file_name, 'w') as f:
+        f.write(soup.prettify(formatter=None))
+
+
+def output_index(page_info, output_path='.'):
+    template = '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <title>Index of dialy</title>
+    </head>
+    <body>
+    <h1>Index of dialy</h1>
+    <table>
+    <tr><th>Date</th><th>Title</th></tr>
+    </table>
+    </body>
+    </html>
+    '''
+
+    soup = BeautifulSoup(template, 'html.parser')
+    table_tag = soup.table
+
+    for info in page_info:
+        tr_tag = soup.new_tag('tr')
+        date_td_tag = soup.new_tag('td')
+        date_td_tag.string = info['date'].strftime('%Y年%m月%d日%H:%M')
+        tr_tag.append(date_td_tag)
+        title_td_tag = soup.new_tag('td')
+        title_a_tag = soup.new_tag('a')
+        title_a_tag['href'] = './{}.html'.format(info['diary_id'])
+        title_a_tag.string = info['title']
+        title_td_tag.append(title_a_tag)
+        tr_tag.append(title_td_tag)
+        table_tag.append(tr_tag)
+
+    file_name = os.path.join(output_path, 'index.html')
     with open(file_name, 'w') as f:
         f.write(soup.prettify(formatter=None))
 
