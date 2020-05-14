@@ -68,6 +68,7 @@ def test_output_htmlfile(diary_page, tmpdir):
 
     tslove.diarydump.remove_script(soup)
     tslove.diarydump.remove_form_items(soup)
+    tslove.diarydump.fix_link(soup)
 
     tslove.diarydump.output_diary('actual-diary-page', contents, soup, output_path=tmpdir)
 

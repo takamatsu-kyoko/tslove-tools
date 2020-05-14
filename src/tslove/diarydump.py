@@ -74,6 +74,7 @@ def main():
 
             remove_script(diary_page)
             remove_form_items(diary_page)
+            fix_link(diary_page)
 
             output_diary(diary_id, contents, diary_page, output_path=output_path)
         except Exception as e:
@@ -181,6 +182,41 @@ def remove_form_items(soup):
     input_tags = soup.find_all('input')
     for input_tag in input_tags:
         input_tag.decompose()
+
+
+def fix_link(soup):
+    link_tag = soup.find('link', rel='stylesheet')
+    if link_tag:
+        link_tag['href'] = './stylesheet/tslove.css'
+
+    a_tags_to_diary_list = soup.find_all('a', href=re.compile(r'^(\./)?\?m=pc&a=page_fh_diary_list.*'))
+    for a_tag_to_diary_list in a_tags_to_diary_list:
+        a_tag_to_diary_list['href'] = './index.html'
+        del(a_tag_to_diary_list['rel'])
+        del(a_tag_to_diary_list['target'])
+
+    a_tags_to_dialy = soup.find_all('a', href=re.compile(r'^(\./)?\?m=pc&a=page_fh_diary.*'))
+    for a_tag_to_dialy in a_tags_to_dialy:
+        result = DIARY_ID_PATTERN.match(a_tag_to_dialy['href'])
+        if result:
+            diary_id = result.group('id')
+            a_tag_to_dialy['href'] = './{}.html'.format(diary_id)
+        else:
+            a_tag_to_dialy['href'] = '#'
+        del(a_tag_to_dialy['rel'])
+        del(a_tag_to_dialy['target'])
+
+    a_tags_to_top = soup.find_all('a', href='./')
+    for a_tag_to_top in a_tags_to_top:
+        a_tag_to_top['href'] = './index.html'
+        del(a_tag_to_top['rel'])
+        del(a_tag_to_top['target'])
+
+    a_tags_to_action = soup.find_all('a', href=re.compile(r'^(\./)?\?m=pc&a=.+'))
+    for a_tag_to_action in a_tags_to_action:
+        a_tag_to_action['href'] = '#'
+        del(a_tag_to_action['rel'])
+        del(a_tag_to_action['target'])
 
 
 def output_diary(diary_id, contents, soup, output_path='.'):
