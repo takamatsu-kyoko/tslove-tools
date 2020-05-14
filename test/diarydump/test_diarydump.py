@@ -66,6 +66,9 @@ def test_output_htmlfile(diary_page, tmpdir):
     contents = {'title': 'dummy', 'date': 'dummy'}
     soup = BeautifulSoup(diary_page, 'html.parser')
 
+    tslove.diarydump.remove_script(soup)
+    tslove.diarydump.remove_form_items(soup)
+
     tslove.diarydump.output_diary('actual-diary-page', contents, soup, output_path=tmpdir)
 
     assert filecmp.cmp(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data/expect-diary-page.html'),

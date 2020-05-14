@@ -71,6 +71,10 @@ def main():
         try:
             diary_page = BeautifulSoup(web.get_diary_page(diary_id), 'html.parser')
             contents = collect_contents(diary_page)
+
+            remove_script(diary_page)
+            remove_form_items(diary_page)
+
             output_diary(diary_id, contents, diary_page, output_path=output_path)
         except Exception as e:
             print('Processing diary id {} failed. {}'.format(diary_id, e))
@@ -149,6 +153,34 @@ def output_stylesheet(stylesheet, output_path='.'):
                 new_path = './' + convert_stylesheet_image_path_to_filename(old_path)
                 line = line.replace(old_path, new_path)
             f.write(line + '\n')
+
+
+def remove_script(soup):
+    script_tags = soup.find_all('script')
+    for script_tag in script_tags:
+        script_tag.decompose()
+
+    a_tags_with_script = soup.find_all('a', onclick=True)
+    for a_tag in a_tags_with_script:
+        a_tag.decompose()
+
+
+def remove_form_items(soup):
+    div_tag = soup.find('div', id='commentForm')
+    if div_tag:
+        div_tag.decompose()
+
+    div_tags = soup.find_all('div', class_='operation')
+    for div_tag in div_tags:
+        div_tag.decompose()
+
+    form_tag = soup.find('form')
+    if form_tag:
+        form_tag.unwrap()
+
+    input_tags = soup.find_all('input')
+    for input_tag in input_tags:
+        input_tag.decompose()
 
 
 def output_diary(diary_id, contents, soup, output_path='.'):
