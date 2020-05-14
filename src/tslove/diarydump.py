@@ -1,4 +1,5 @@
 from bs4 import BeautifulSoup
+from PIL import Image
 import getpass
 import re
 import os
@@ -72,9 +73,12 @@ def main():
             diary_page = BeautifulSoup(web.get_diary_page(diary_id), 'html.parser')
             contents = collect_contents(diary_page)
 
+            image_paths = collect_image_paths(diary_page)
+            fetch_images(web, image_paths, output_path=image_output_path)
+
             remove_script(diary_page)
             remove_form_items(diary_page)
-            fix_link(diary_page)
+            fix_link(diary_page, output_path=output_path)
 
             output_diary(diary_id, contents, diary_page, output_path=output_path)
         except Exception as e:
@@ -134,7 +138,7 @@ def fetch_stylesheet_images(web, image_paths, output_path='.', overwrite=False):
 
 
 def convert_stylesheet_image_path_to_filename(path):
-    pattern = re.compile(r'image_filename=(?P<filename>.+)&*')
+    pattern = re.compile(r'image_filename=(?P<filename>[^&;?]+)')
     result = pattern.search(path)
     if result:
         filename = result.group('filename')
@@ -154,6 +158,47 @@ def output_stylesheet(stylesheet, output_path='.'):
                 new_path = './' + convert_stylesheet_image_path_to_filename(old_path)
                 line = line.replace(old_path, new_path)
             f.write(line + '\n')
+
+
+def collect_image_paths(soup):
+    paths = set()
+    for img_tag in soup.find_all('img'):
+        if '://' not in img_tag['src']:
+            paths.add(img_tag['src'])
+
+    return paths
+
+
+def fetch_images(web, image_paths, output_path='.', overwrite=False):
+
+    for path in image_paths:
+        filename = os.path.join(output_path, convert_image_path_to_filename(path))
+        if os.path.exists(filename) and overwrite is False:
+            continue
+
+        try:
+            if 'img.php' in path:
+                params = {'m': 'pc',
+                          'filename': convert_image_path_to_filename(path),
+                          }
+                image = web.get_image('img.php', params)
+            else:
+                image = web.get_image(path)
+            image.save(filename)
+        except Exception as e:
+            print('Can not get image {}. {}'.format(path, e))
+            continue
+
+
+def convert_image_path_to_filename(path):
+    pattern = re.compile(r'filename=(?P<filename>[^&;?]+)')
+    result = pattern.search(path)
+    if result:
+        filename = result.group('filename')
+    else:
+        filename = os.path.basename(path)
+
+    return filename
 
 
 def remove_script(soup):
@@ -184,7 +229,7 @@ def remove_form_items(soup):
         input_tag.decompose()
 
 
-def fix_link(soup):
+def fix_link(soup, output_path='.'):
     link_tag = soup.find('link', rel='stylesheet')
     if link_tag:
         link_tag['href'] = './stylesheet/tslove.css'
@@ -217,6 +262,24 @@ def fix_link(soup):
         a_tag_to_action['href'] = '#'
         del(a_tag_to_action['rel'])
         del(a_tag_to_action['target'])
+
+    a_tags_to_img = soup.find_all('a', href=re.compile(r'^(\./)?img.php.+'))
+    for a_tag_to_img in a_tags_to_img:
+        a_tag_to_img['href'] = './images/' + convert_image_path_to_filename(a_tag_to_img['href'])
+
+    img_tags = soup.find_all('img')
+    for img_tag in img_tags:
+        path = './images/' + convert_image_path_to_filename(img_tag['src'])
+        if 'w=120&h=120' in img_tag['src']:
+            image = Image.open(os.path.join(output_path, path))
+            if image.size[0] == image.size[1]:
+                img_tag['width'] = 120
+                img_tag['height'] = 120
+            elif image.size[0] > image.size[1]:
+                img_tag['width'] = 120
+            else:
+                img_tag['height'] = 120
+        img_tag['src'] = path
 
 
 def output_diary(diary_id, contents, soup, output_path='.'):

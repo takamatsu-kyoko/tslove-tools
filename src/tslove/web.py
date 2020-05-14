@@ -110,16 +110,22 @@ class WebUI:
         else:
             raise RuntimeError('retry counter expiered')
 
-    def get_image(self, path):
+    def get_image(self, path, params=None):
         for count in range(self._retry_count, 0, -1):
             if count != self._retry_count:
                 time.sleep(self._retry_interval)
 
-            response = requests.get(self.url + path, cookies=self._cookies, verify=False)
+            if path == 'img.php':
+                response = requests.get(self.url + path, params=params, cookies=self._cookies, verify=False)
+            else:
+                response = requests.get(self.url + path, cookies=self._cookies, verify=False)
             response.raise_for_status()
 
             if not response.headers['Content-Type'].startswith('image/'):
-                print('Retry get image({}) after {} sec.'.format(path, self._retry_interval))
+                if path == 'img.php':
+                    print('Retry get image(img.php:{}) after {} sec.'.format(params['filename'], self._retry_interval))
+                else:
+                    print('Retry get image({}) after {} sec.'.format(path, self._retry_interval))
                 continue
 
             return Image.open(io.BytesIO(response.content))
