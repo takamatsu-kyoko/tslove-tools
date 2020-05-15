@@ -1,6 +1,7 @@
 from bs4 import BeautifulSoup
 from PIL import Image
 import getpass
+import argparse
 import re
 import os
 import time
@@ -13,10 +14,26 @@ URL_PATTERN = re.compile(r'url\((?P<path>.+)\)')
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-f', '--from', help='diary_id to start', metavar='<id>', type=int, default=None)
+    parser.add_argument('-t', '--to', help='diary_id to end', metavar='<id>', type=int, default=None)
+    parser.add_argument('-o', '--output', help='destination to dump. (default ./dump)', metavar='<PATH>', default='./dump')
+    parser.add_argument('--php-session-id', metavar='', help='for debug', default=None)
+    args = parser.parse_args()
+
     web = tslove.web.WebUI(url='https://tslove.net/')
-    php_session_id = None
-    diary_id = None
-    output_path = os.path.join('.', 'dump')
+    php_session_id = args.php_session_id
+
+    diary_id_from, diary_id_to = vars(args)['from'], args.to  # from is keyword
+    if diary_id_from and diary_id_to and diary_id_from < diary_id_to:
+        diary_id_from, diary_id_to = diary_id_to, diary_id_from
+
+    if diary_id_from:
+        diary_id_from = str(diary_id_from)
+    if diary_id_to:
+        diary_id_to = str(diary_id_to)
+
+    output_path = os.path.join(args.output)
     stylesheet_output_path = os.path.join(output_path, 'stylesheet')
     image_output_path = os.path.join(output_path, 'images')
 
@@ -58,7 +75,7 @@ def main():
         print('Can not get stylesheet. {}'.format(e))
         exit(1)
 
-    if diary_id is None:
+    if diary_id_from is None:
         try:
             profile_page = BeautifulSoup(web.get_myprofile_page(), 'html.parser')
             diary_list = profile_page.find('ul', class_='articleList')
@@ -67,6 +84,8 @@ def main():
         except Exception as e:
             print('Can not get first diary id. {}'.format(e))
             exit(1)
+    else:
+        diary_id = diary_id_from
 
     contents = None
     while diary_id:
@@ -95,6 +114,10 @@ def main():
             break
 
         print('diary id {} ({}) processed.'.format(diary_id, contents['title']))
+
+        if diary_id == diary_id_to:
+            break
+
         diary_id = contents['prev_diary_id']
 
     output_index(page_info, output_path=output_path)
