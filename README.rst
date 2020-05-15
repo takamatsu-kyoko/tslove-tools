@@ -8,13 +8,19 @@ Description
 
 T's Love 用に作られたツール群です。以下のツールがあります。
 
-imechen
+imechen (`doc <https://github.com/takamatsu-kyoko/tslove-tools/blob/master/doc/imechen.rst>`_)
   T's LOVEのプロフィール画像を差し替えます
 
-diarydump
+diarydump (`doc <https://github.com/takamatsu-kyoko/tslove-tools/blob/master/doc/diarydump.rst>`_)
   T's LOVEの日記を一括してダウンロードします
 
 各ツールの説明は doc ディレクトリの内容を確認してください。
+
+また、diarydumpについてPythonのインストールからコマンドの実行までを説明した文章があるので必要に応じてご覧ください。
+
+- Windows用
+
+  - `QuickSetupGuide-windows <https://github.com/takamatsu-kyoko/tslove-tools/wiki/QuickSetupGuide-windows>`__
 
 Requirement
 -----------
