@@ -11,6 +11,9 @@ T's Love 用に作られたツール群です。以下のツールがありま�
 imechen
   T's LOVEのプロフィール画像を差し替えます
 
+diarydump
+  T's LOVEの日記を一括してダウンロードします
+
 各ツールの説明は doc ディレクトリの内容を確認してください。
 
 Requirement
@@ -18,13 +21,23 @@ Requirement
 
 - python3
 - requests
+- beautifulsoup4
+- pillow
+
+開発環境では以下も必要
+
+- pytest
 
 Installation
 ------------
 
-::
+通常のインストール ::
 
   pip install <path>
+
+開発環境でのインストール ::
+
+  pip install -e <path>[develop]
 
 Licence
 -------
