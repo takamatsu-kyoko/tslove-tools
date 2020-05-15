@@ -185,7 +185,7 @@ def convert_stylesheet_image_path_to_filename(path):
 
 def output_stylesheet(stylesheet, output_path='.'):
     file_name = os.path.join(output_path, 'tslove.css')
-    with open(file_name, 'w') as f:
+    with open(file_name, 'w', encoding='utf-8') as f:
         for line in stylesheet.splitlines():
             result = URL_PATTERN.search(line)
             if result:
@@ -319,7 +319,7 @@ def fix_link(soup, output_path='.'):
 
 def output_diary(diary_id, contents, soup, output_path='.'):
     file_name = os.path.join(output_path, '{}.html'.format(diary_id))
-    with open(file_name, 'w') as f:
+    with open(file_name, 'w', encoding='utf-8') as f:
         f.write(soup.prettify(formatter=None))
 
 
@@ -329,6 +329,7 @@ def output_index(page_info, output_path='.'):
     <html>
     <head>
     <title>Index of dialy</title>
+    <meta charset="utf-8"/>
     </head>
     <body>
     <h1>Index of dialy</h1>
@@ -356,7 +357,7 @@ def output_index(page_info, output_path='.'):
         table_tag.append(tr_tag)
 
     file_name = os.path.join(output_path, 'index.html')
-    with open(file_name, 'w') as f:
+    with open(file_name, 'w', encoding='utf-8') as f:
         f.write(soup.prettify(formatter=None))
 
 
