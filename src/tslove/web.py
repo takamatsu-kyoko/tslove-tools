@@ -146,4 +146,10 @@ class WebUI:
                   'order': 'asc',
                   'page_size': 100
                   }
-        return self.get_page(params)
+        page = self.get_page(params)
+
+        error_pattern = re.compile(r'<td>該当する日記が見つかりません。</td>')
+        if error_pattern.search(page):
+            raise RuntimeError('No such diary')
+
+        return page
