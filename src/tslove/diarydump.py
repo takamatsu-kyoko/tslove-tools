@@ -304,15 +304,21 @@ def fix_link(soup, output_path='.'):
 
     img_tags = soup.find_all('img')
     for img_tag in img_tags:
-        path = './images/' + convert_image_path_to_filename(img_tag['src'])
+        path = os.path.join('./images/', convert_image_path_to_filename(img_tag['src']))
         if 'w=120&h=120' in img_tag['src']:
-            image = Image.open(os.path.join(output_path, path))
-            if image.size[0] == image.size[1]:
-                img_tag['width'] = 120
-                img_tag['height'] = 120
-            elif image.size[0] > image.size[1]:
-                img_tag['width'] = 120
+            target_file = os.path.join(output_path, path)
+
+            if os.path.exists(target_file):
+                image = Image.open(target_file)
+                if image.size[0] == image.size[1]:
+                    img_tag['width'] = 120
+                    img_tag['height'] = 120
+                elif image.size[0] > image.size[1]:
+                    img_tag['width'] = 120
+                else:
+                    img_tag['height'] = 120
             else:
+                img_tag['width'] = 120
                 img_tag['height'] = 120
         img_tag['src'] = path
 
