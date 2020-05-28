@@ -113,7 +113,7 @@ def main():
         except KeyboardInterrupt:
             break
 
-        print('diary id {} ({}) processed.'.format(diary_id, contents['title']))
+        print('diary id {} ({}:{}) processed.'.format(diary_id, contents['date'].strftime('%Y-%m-%d'), contents['title']))
 
         if diary_id == diary_id_to:
             break
