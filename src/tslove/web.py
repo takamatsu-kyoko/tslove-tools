@@ -15,6 +15,9 @@ class WebUI:
         self._retry_count = 10
         self._retry_interval = 10
         self._cookies = {}
+        self._request_header = {
+            'User-Agent': 'tslove-tools written by T.Kyoko (tslove member_id=45642)',
+        }
         self._sns_session_id = None
 
     def login(self, username, password, php_session_id=None):
@@ -42,7 +45,7 @@ class WebUI:
             if count != self._retry_count:
                 time.sleep(self._retry_interval)
 
-            response = requests.post(self.url, data=payload, verify=False, allow_redirects=False)
+            response = requests.post(self.url, headers=self._request_header, data=payload, verify=False, allow_redirects=False)
             response.raise_for_status()
 
             if 'PHPSESSID' in response.cookies:
@@ -75,7 +78,7 @@ class WebUI:
             if count != self._retry_count:
                 time.sleep(self._retry_interval)
 
-            response = requests.get(self.url, params=params, cookies=self._cookies, verify=False)
+            response = requests.get(self.url, headers=self._request_header, params=params, cookies=self._cookies, verify=False)
             response.raise_for_status()
 
             title_pattern = re.compile(r'<title>(?P<title>.+)</title>')
@@ -94,7 +97,7 @@ class WebUI:
             if count != self._retry_count:
                 time.sleep(self._retry_interval)
 
-            response = requests.get(self.url + 'xhtml_style.php', cookies=self._cookies, verify=False)
+            response = requests.get(self.url + 'xhtml_style.php', headers=self._request_header, cookies=self._cookies, verify=False)
             response.raise_for_status()
 
             response.encoding = response.apparent_encoding
@@ -116,9 +119,9 @@ class WebUI:
                 time.sleep(self._retry_interval)
 
             if path == 'img.php':
-                response = requests.get(self.url + path, params=params, cookies=self._cookies, verify=False)
+                response = requests.get(self.url + path, headers=self._request_header, params=params, cookies=self._cookies, verify=False)
             else:
-                response = requests.get(self.url + path, cookies=self._cookies, verify=False)
+                response = requests.get(self.url + path, headers=self._request_header, cookies=self._cookies, verify=False)
             response.raise_for_status()
 
             if not response.headers['Content-Type'].startswith('image/'):
