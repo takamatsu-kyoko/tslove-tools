@@ -37,6 +37,10 @@ def main():
     stylesheet_output_path = os.path.join(output_path, 'stylesheet')
     image_output_path = os.path.join(output_path, 'images')
 
+    interval_short = 10
+    interval_long = 20
+    interval_change_timing = 5
+
     page_info = []
 
     login = False
@@ -88,11 +92,16 @@ def main():
         diary_id = diary_id_from
 
     contents = None
-    while diary_id:
-        try:
-            if contents:
-                time.sleep(5)
+    no_retry_count = 0
+    interval = interval_long
 
+    while diary_id:
+        if contents:
+            time.sleep(interval)
+
+        web.last_retries = 0
+
+        try:
             diary_page = BeautifulSoup(web.get_diary_page(diary_id), 'html.parser')
             contents = collect_contents(diary_page)
             contents['diary_id'] = diary_id
@@ -113,12 +122,24 @@ def main():
         except KeyboardInterrupt:
             break
 
-        print('diary id {} ({}) processed.'.format(diary_id, contents['title']))
+        print('diary id {} ({}:{}) processed.'.format(diary_id, contents['date'].strftime('%Y-%m-%d'), contents['title']))
 
         if diary_id == diary_id_to:
             break
 
         diary_id = contents['prev_diary_id']
+
+        if web.last_retries == 0:
+            no_retry_count += 1
+        else:
+            no_retry_count = 0
+
+        if diary_id and no_retry_count > interval_change_timing and not interval == interval_short:
+            print('interval changes {} sec. to {} sec.'.format(interval, interval_short))
+            interval = interval_short
+        if diary_id and no_retry_count <= interval_change_timing and not interval == interval_long:
+            print('interval changes {} sec. to {} sec.'.format(interval, interval_long))
+            interval = interval_long
 
     output_index(page_info, output_path=output_path)
     print('done.')
@@ -304,15 +325,21 @@ def fix_link(soup, output_path='.'):
 
     img_tags = soup.find_all('img')
     for img_tag in img_tags:
-        path = './images/' + convert_image_path_to_filename(img_tag['src'])
+        path = os.path.join('./images/', convert_image_path_to_filename(img_tag['src']))
         if 'w=120&h=120' in img_tag['src']:
-            image = Image.open(os.path.join(output_path, path))
-            if image.size[0] == image.size[1]:
-                img_tag['width'] = 120
-                img_tag['height'] = 120
-            elif image.size[0] > image.size[1]:
-                img_tag['width'] = 120
+            target_file = os.path.join(output_path, path)
+
+            if os.path.exists(target_file):
+                image = Image.open(target_file)
+                if image.size[0] == image.size[1]:
+                    img_tag['width'] = 120
+                    img_tag['height'] = 120
+                elif image.size[0] > image.size[1]:
+                    img_tag['width'] = 120
+                else:
+                    img_tag['height'] = 120
             else:
+                img_tag['width'] = 120
                 img_tag['height'] = 120
         img_tag['src'] = path
 
