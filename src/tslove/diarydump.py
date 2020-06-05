@@ -37,6 +37,10 @@ def main():
     stylesheet_output_path = os.path.join(output_path, 'stylesheet')
     image_output_path = os.path.join(output_path, 'images')
 
+    interval_short = 10
+    interval_long = 20
+    interval_change_timing = 5
+
     page_info = []
 
     login = False
@@ -88,11 +92,16 @@ def main():
         diary_id = diary_id_from
 
     contents = None
-    while diary_id:
-        try:
-            if contents:
-                time.sleep(5)
+    no_retry_count = 0
+    interval = interval_long
 
+    while diary_id:
+        if contents:
+            time.sleep(interval)
+
+        web.last_retries = 0
+
+        try:
             diary_page = BeautifulSoup(web.get_diary_page(diary_id), 'html.parser')
             contents = collect_contents(diary_page)
             contents['diary_id'] = diary_id
@@ -119,6 +128,18 @@ def main():
             break
 
         diary_id = contents['prev_diary_id']
+
+        if web.last_retries == 0:
+            no_retry_count += 1
+        else:
+            no_retry_count = 0
+
+        if diary_id and no_retry_count > interval_change_timing and not interval == interval_short:
+            print('interval changes {} sec. to {} sec.'.format(interval, interval_short))
+            interval = interval_short
+        if diary_id and no_retry_count <= interval_change_timing and not interval == interval_long:
+            print('interval changes {} sec. to {} sec.'.format(interval, interval_long))
+            interval = interval_long
 
     output_index(page_info, output_path=output_path)
     print('done.')
