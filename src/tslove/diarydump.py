@@ -18,6 +18,7 @@ def main():
     parser.add_argument('-f', '--from', help='diary_id to start', metavar='<id>', type=int, default=None)
     parser.add_argument('-t', '--to', help='diary_id to end', metavar='<id>', type=int, default=None)
     parser.add_argument('-o', '--output', help='destination to dump. (default ./dump)', metavar='<PATH>', default='./dump')
+    parser.add_argument('--echo-password', help='display password on screen(DANGER)', action='store_true')
     parser.add_argument('--php-session-id', metavar='', help='for debug', default=None)
     args = parser.parse_args()
 
@@ -51,7 +52,10 @@ def main():
         if login is False:
             print('Enter username and password')
             username = input('user: ')
-            password = getpass.getpass(prompt='pass: ')
+            if not args.echo_password:
+                password = getpass.getpass(prompt='pass: ')
+            else:
+                password = input('pass: ')
             login = web.login(username, password)
     except Exception as e:
         print('Login failed. {}'.format(e))
@@ -96,12 +100,12 @@ def main():
     interval = interval_long
 
     while diary_id:
-        if contents:
-            time.sleep(interval)
-
-        web.last_retries = 0
-
         try:
+            if contents:
+                time.sleep(interval)
+
+            web.last_retries = 0
+
             diary_page = BeautifulSoup(web.get_diary_page(diary_id), 'html.parser')
             contents = collect_contents(diary_page)
             contents['diary_id'] = diary_id
