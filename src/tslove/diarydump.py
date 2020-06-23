@@ -1,3 +1,5 @@
+# coding: utf-8
+
 from bs4 import BeautifulSoup
 from PIL import Image
 import getpass
@@ -50,7 +52,7 @@ def main():
 
         if login is False:
             print('Enter username and password')
-            username = input('user: ')
+            username = raw_input('user: ')
             password = getpass.getpass(prompt='pass: ')
             login = web.login(username, password)
     except Exception as e:
@@ -147,9 +149,9 @@ def main():
 
 def collect_contents(soup):
     contents = {}
-    contents['title'] = str(soup.find('p', class_='heading').string)
+    contents['title'] = str(soup.find('p', class_='heading').string.encode('utf8', 'ignore'))
 
-    date = str(soup.find('div', class_='dparts diaryDetailBox').div.dl.dt.get_text())
+    date = str(soup.find('div', class_='dparts diaryDetailBox').div.dl.dt.get_text().encode('utf8', 'ignore'))
     contents['date'] = datetime.datetime.strptime(date, '%Y年%m月%d日%H:%M')
 
     result = soup.find('p', class_='prev')
@@ -206,14 +208,14 @@ def convert_stylesheet_image_path_to_filename(path):
 
 def output_stylesheet(stylesheet, output_path='.'):
     file_name = os.path.join(output_path, 'tslove.css')
-    with open(file_name, 'w', encoding='utf-8') as f:
+    with open(file_name, 'w') as f:
         for line in stylesheet.splitlines():
             result = URL_PATTERN.search(line)
             if result:
                 old_path = result.group('path')
                 new_path = './' + convert_stylesheet_image_path_to_filename(old_path)
                 line = line.replace(old_path, new_path)
-            f.write(line + '\n')
+            f.write((line + '\n').encode('utf8', 'ignore'))
 
 
 def collect_image_paths(soup):
@@ -346,8 +348,8 @@ def fix_link(soup, output_path='.'):
 
 def output_diary(diary_id, contents, soup, output_path='.'):
     file_name = os.path.join(output_path, '{}.html'.format(diary_id))
-    with open(file_name, 'w', encoding='utf-8') as f:
-        f.write(soup.prettify(formatter=None))
+    with open(file_name, 'w') as f:
+        f.write(soup.prettify(formatter=None).encode('utf8', 'ignore'))
 
 
 def output_index(page_info, output_path='.'):
@@ -384,8 +386,8 @@ def output_index(page_info, output_path='.'):
         table_tag.append(tr_tag)
 
     file_name = os.path.join(output_path, 'index.html')
-    with open(file_name, 'w', encoding='utf-8') as f:
-        f.write(soup.prettify(formatter=None))
+    with open(file_name, 'w') as f:
+        f.write(soup.prettify(formatter=None).encode('utf8', 'ignore'))
 
 
 if __name__ == "__main__":

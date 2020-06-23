@@ -1,3 +1,5 @@
+# coding: utf-8
+
 import requests
 from bs4 import BeautifulSoup
 from PIL import Image
@@ -90,7 +92,7 @@ class WebUI:
 
             title_pattern = re.compile(r'<title>(?P<title>.+)</title>')
             result = title_pattern.search(response.text)
-            if result and not result.group('title') == 'ページが表示できませんでした':
+            if result and not result.group('title') == u'ページが表示できませんでした':
                 self.last_retries += count
                 return response.text
 
