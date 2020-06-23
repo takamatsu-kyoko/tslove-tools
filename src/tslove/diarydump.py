@@ -100,12 +100,12 @@ def main():
     interval = interval_long
 
     while diary_id:
-        if contents:
-            time.sleep(interval)
-
-        web.last_retries = 0
-
         try:
+            if contents:
+                time.sleep(interval)
+
+            web.last_retries = 0
+
             diary_page = BeautifulSoup(web.get_diary_page(diary_id), 'html.parser')
             contents = collect_contents(diary_page)
             contents['diary_id'] = diary_id
