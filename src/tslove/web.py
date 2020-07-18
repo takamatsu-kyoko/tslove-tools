@@ -137,6 +137,8 @@ class WebUI:
             if response.headers['Content-Type'].startswith('image/'):
                 self.last_retries += count
                 return Image.open(io.BytesIO(response.content))
+            elif response.headers['Content-Type'] == 'text/html' and response.headers['Content-Length'] == '0':
+                return Image.new("1", (1, 1), 1)
 
         else:
             raise RuntimeError('retry counter expiered')
