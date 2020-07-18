@@ -10,6 +10,7 @@ import datetime
 import tslove.web
 
 DIARY_ID_PATTERN = re.compile(r'\./\?m=pc&a=page_fh_diary&target_c_diary_id=(?P<id>[0-9]+)')
+FIXED_DIARY_ID_PATTERN = re.compile(r'\./(?P<id>[0-9]+).html')
 URL_PATTERN = re.compile(r'url\((?P<path>.+)\)')
 
 
@@ -95,55 +96,75 @@ def main():
     else:
         diary_id = diary_id_from
 
-    contents = None
+    first_download = True
     no_retry_count = 0
     interval = interval_long
 
     while diary_id:
-        try:
-            if contents:
-                time.sleep(interval)
+        try:  # KeyBoardinterrupt
 
-            web.last_retries = 0
+            file_name = os.path.join(output_path, '{}.html'.format(diary_id))
+            if os.path.exists(file_name):
+                source = 'local'
+                try:
+                    with open(file_name, 'r') as f:
+                        diary_page = BeautifulSoup(f, 'html.parser')
+                except Exception as e:
+                    print('Processing diary id {} failed. (local) {}'.format(diary_id, e))
+                    exit(1)
+            else:
+                source = 'remote'
+                try:
+                    if not first_download:
+                        time.sleep(interval)
+                    else:
+                        first_download = False
 
-            diary_page = BeautifulSoup(web.get_diary_page(diary_id), 'html.parser')
+                    web.last_retries = 0
+
+                    diary_page = BeautifulSoup(web.get_diary_page(diary_id), 'html.parser')
+                    image_paths = collect_image_paths(diary_page)
+                    fetch_images(web, image_paths, output_path=image_output_path)
+
+                    remove_script(diary_page)
+                    remove_form_items(diary_page)
+                    fix_link(diary_page, output_path=output_path)
+
+                    output_diary(diary_page, file_name)
+
+                    if web.last_retries == 0:
+                        no_retry_count += 1
+                    else:
+                        no_retry_count = 0
+
+                    if no_retry_count > interval_change_timing and not interval == interval_short:
+                        print('interval changes {} sec. to {} sec.'.format(interval, interval_short))
+                        interval = interval_short
+                    if no_retry_count <= interval_change_timing and not interval == interval_long:
+                        print('interval changes {} sec. to {} sec.'.format(interval, interval_long))
+                        interval = interval_long
+
+                except Exception as e:
+                    print('Processing diary id {} failed. {}'.format(diary_id, e))
+                    exit(1)
+
             contents = collect_contents(diary_page)
             contents['diary_id'] = diary_id
 
-            image_paths = collect_image_paths(diary_page)
-            fetch_images(web, image_paths, output_path=image_output_path)
-
-            remove_script(diary_page)
-            remove_form_items(diary_page)
-            fix_link(diary_page, output_path=output_path)
-
-            output_diary(diary_id, contents, diary_page, output_path=output_path)
-
             page_info.append(contents)
-        except Exception as e:
-            print('Processing diary id {} failed. {}'.format(diary_id, e))
-            exit(1)
+
+            print('diary id {} ({}:{}) processed.{}'.format(diary_id,
+                                                            contents['date'].strftime('%Y-%m-%d'),
+                                                            contents['title'],
+                                                            '' if source == 'remote' else ' (local)'))
+
+            if diary_id == diary_id_to or contents['prev_diary_id'] is None:
+                break
+
+            diary_id = contents['prev_diary_id']
+
         except KeyboardInterrupt:
             break
-
-        print('diary id {} ({}:{}) processed.'.format(diary_id, contents['date'].strftime('%Y-%m-%d'), contents['title']))
-
-        if diary_id == diary_id_to:
-            break
-
-        diary_id = contents['prev_diary_id']
-
-        if web.last_retries == 0:
-            no_retry_count += 1
-        else:
-            no_retry_count = 0
-
-        if diary_id and no_retry_count > interval_change_timing and not interval == interval_short:
-            print('interval changes {} sec. to {} sec.'.format(interval, interval_short))
-            interval = interval_short
-        if diary_id and no_retry_count <= interval_change_timing and not interval == interval_long:
-            print('interval changes {} sec. to {} sec.'.format(interval, interval_long))
-            interval = interval_long
 
     output_index(page_info, output_path=output_path)
     print('done.')
@@ -151,14 +172,14 @@ def main():
 
 def collect_contents(soup):
     contents = {}
-    contents['title'] = str(soup.find('p', class_='heading').string)
+    contents['title'] = str(soup.find('p', class_='heading').get_text(strip=True))
 
-    date = str(soup.find('div', class_='dparts diaryDetailBox').div.dl.dt.get_text())
+    date = str(soup.find('div', class_='dparts diaryDetailBox').div.dl.dt.get_text(strip=True))
     contents['date'] = datetime.datetime.strptime(date, '%Y年%m月%d日%H:%M')
 
     result = soup.find('p', class_='prev')
     if result:
-        result = DIARY_ID_PATTERN.match(result.a['href'])
+        result = FIXED_DIARY_ID_PATTERN.match(result.a['href'])
 
     if result:
         contents['prev_diary_id'] = result.group('id')
@@ -348,8 +369,7 @@ def fix_link(soup, output_path='.'):
         img_tag['src'] = path
 
 
-def output_diary(diary_id, contents, soup, output_path='.'):
-    file_name = os.path.join(output_path, '{}.html'.format(diary_id))
+def output_diary(soup, file_name):
     with open(file_name, 'w', encoding='utf-8') as f:
         f.write(soup.prettify(formatter=None))
 
