@@ -75,14 +75,16 @@ def main():
             print('Can not create directory {}. {}'.format(directory, e))
             exit(1)
 
-    try:
-        stylesheet = web.get_stylesheet()
-        image_paths = collect_stylesheet_image_paths(stylesheet)
-        fetch_stylesheet_images(web, image_paths, output_path=stylesheet_output_path)
-        output_stylesheet(stylesheet, output_path=stylesheet_output_path)
-    except Exception as e:
-        print('Can not get stylesheet. {}'.format(e))
-        exit(1)
+    stylesheet_file_name = os.path.join(stylesheet_output_path, 'tslove.css')
+    if not os.path.exists(stylesheet_file_name):
+        try:
+            stylesheet = web.get_stylesheet()
+            image_paths = collect_stylesheet_image_paths(stylesheet)
+            fetch_stylesheet_images(web, image_paths, output_path=stylesheet_output_path)
+            output_stylesheet(stylesheet, stylesheet_file_name)
+        except Exception as e:
+            print('Can not get stylesheet. {}'.format(e))
+            exit(1)
 
     if diary_id_from is None:
         try:
@@ -264,8 +266,7 @@ def convert_stylesheet_image_path_to_filename(path):
     return filename
 
 
-def output_stylesheet(stylesheet, output_path='.'):
-    file_name = os.path.join(output_path, 'tslove.css')
+def output_stylesheet(stylesheet, file_name):
     with open(file_name, 'w', encoding='utf-8') as f:
         for line in stylesheet.splitlines():
             result = URL_PATTERN.search(line)

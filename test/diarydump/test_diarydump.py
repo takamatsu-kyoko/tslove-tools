@@ -86,7 +86,7 @@ def test_convert_stylesheet_image_path_to_filename():
 
 
 def test_output_stylesheet(stylesheet, tmpdir):
-    tslove.diarydump.output_stylesheet(stylesheet, output_path=tmpdir)
+    tslove.diarydump.output_stylesheet(stylesheet, os.path.join(tmpdir, 'tslove.css'))
 
     assert filecmp.cmp(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data/expect-stylesheet.css'),
                        os.path.join(tmpdir, 'tslove.css'))
