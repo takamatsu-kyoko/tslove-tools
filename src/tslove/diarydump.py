@@ -6,6 +6,7 @@ import re
 import os
 import time
 import datetime
+import json
 
 import tslove.web
 
@@ -38,12 +39,11 @@ def main():
     output_path = os.path.join(args.output)
     stylesheet_output_path = os.path.join(output_path, 'stylesheet')
     image_output_path = os.path.join(output_path, 'images')
+    tools_path = os.path.join(output_path, 'tslove-tools')
 
     interval_short = 10
     interval_long = 20
     interval_change_timing = 5
-
-    page_info = []
 
     login = False
     try:
@@ -66,7 +66,7 @@ def main():
         print('Login failed.')
         exit(1)
 
-    directories = [output_path, stylesheet_output_path, image_output_path]
+    directories = [output_path, stylesheet_output_path, image_output_path, tools_path]
     for directory in directories:
         try:
             if not os.path.exists(directory):
@@ -96,22 +96,44 @@ def main():
     else:
         diary_id = diary_id_from
 
+    page_info = {}
+
+    page_info_path = os.path.join(tools_path, 'page_info.json')
+    if os.path.exists(page_info_path):
+        try:
+            page_info = load_page_info(page_info_path)
+        except Exception as e:
+            print('Can not load page info {}. {}'.format(page_info_path, e))
+            exit(1)
+
     first_download = True
     no_retry_count = 0
     interval = interval_long
+    use_page_info = 0
 
     while diary_id:
         try:  # KeyBoardinterrupt
 
             file_name = os.path.join(output_path, '{}.html'.format(diary_id))
             if os.path.exists(file_name):
-                source = 'local'
-                try:
-                    with open(file_name, 'r') as f:
-                        diary_page = BeautifulSoup(f, 'html.parser')
-                except Exception as e:
-                    print('Processing diary id {} failed. (local) {}'.format(diary_id, e))
-                    exit(1)
+                if diary_id not in page_info:
+                    source = 'local'
+                    try:
+                        with open(file_name, 'r') as f:
+                            diary_page = BeautifulSoup(f, 'html.parser')
+                    except Exception as e:
+                        print('Processing diary id {} failed. (local) {}'.format(diary_id, e))
+                        exit(1)
+                else:
+                    source = 'page_info'
+                    use_page_info += 1
+
+                    if diary_id == diary_id_to or page_info[diary_id]['prev_diary_id'] is None:
+                        break
+
+                    diary_id = page_info[diary_id]['prev_diary_id']
+                    continue
+
             else:
                 source = 'remote'
                 try:
@@ -151,7 +173,7 @@ def main():
             contents = collect_contents(diary_page)
             contents['diary_id'] = diary_id
 
-            page_info.append(contents)
+            page_info[diary_id] = contents
 
             print('diary id {} ({}:{}) processed.{}'.format(diary_id,
                                                             contents['date'].strftime('%Y-%m-%d'),
@@ -166,8 +188,21 @@ def main():
         except KeyboardInterrupt:
             break
 
-    output_index(page_info, output_path=output_path)
-    print('done.')
+    try:
+        save_page_info(page_info, page_info_path)
+    except Exception as e:
+        print('Can not save page info {}. {}'.format(page_info_path, e))
+
+    try:
+        output_index(page_info, output_path=output_path)
+    except Exception as e:
+        print('Can not save index file. {}'.format(e))
+        exit(1)
+
+    if use_page_info:
+        print('done. (skip {} diaries)'.format(use_page_info))
+    else:
+        print('done.')
 
 
 def collect_contents(soup):
@@ -374,6 +409,21 @@ def output_diary(soup, file_name):
         f.write(soup.prettify(formatter=None))
 
 
+def load_page_info(file_name):
+    def convert_datetime(dct):
+        if 'date' in dct:
+            dct['date'] = datetime.datetime.strptime(dct['date'], '%Y-%m-%d %H:%M:%S')
+        return dct
+
+    with open(file_name, 'r', encoding='utf-8') as f:
+        return json.load(f, object_hook=convert_datetime)
+
+
+def save_page_info(page_info, file_name):
+    with open(file_name, 'w', encoding='utf-8') as f:
+        json.dump(page_info, f, ensure_ascii=False, indent=2, default=str)
+
+
 def output_index(page_info, output_path='.'):
     template = '''
     <!DOCTYPE html>
@@ -394,15 +444,15 @@ def output_index(page_info, output_path='.'):
     soup = BeautifulSoup(template, 'html.parser')
     table_tag = soup.table
 
-    for info in page_info:
+    for diary_id in sorted(page_info.keys(), reverse=True):
         tr_tag = soup.new_tag('tr')
         date_td_tag = soup.new_tag('td')
-        date_td_tag.string = info['date'].strftime('%Y年%m月%d日%H:%M')
+        date_td_tag.string = page_info[diary_id]['date'].strftime('%Y年%m月%d日%H:%M')
         tr_tag.append(date_td_tag)
         title_td_tag = soup.new_tag('td')
         title_a_tag = soup.new_tag('a')
-        title_a_tag['href'] = './{}.html'.format(info['diary_id'])
-        title_a_tag.string = info['title']
+        title_a_tag['href'] = './{}.html'.format(page_info[diary_id]['diary_id'])
+        title_a_tag.string = page_info[diary_id]['title']
         title_td_tag.append(title_a_tag)
         tr_tag.append(title_td_tag)
         table_tag.append(tr_tag)
