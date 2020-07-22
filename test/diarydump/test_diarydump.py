@@ -26,14 +26,14 @@ def stylesheet():
 
 @pytest.fixture(scope='module')
 def page_info():
-    page_info = []
+    page_info = {}
 
     date1 = datetime.datetime(2020, 5, 1, 10, 50)
     date2 = datetime.datetime(2020, 5, 15, 12, 00)
     date3 = datetime.datetime(2020, 5, 15, 12, 50, 30)
-    page_info.append({'diary_id': '123456', 'date': date1, 'title': 'Title-A'})
-    page_info.append({'diary_id': '111111', 'date': date2, 'title': 'Title-B'})
-    page_info.append({'diary_id': '100000', 'date': date3, 'title': 'Title-C'})
+    page_info['123456'] = {'diary_id': '123456', 'date': date1, 'title': 'Title-A'}
+    page_info['111111'] = {'diary_id': '111111', 'date': date2, 'title': 'Title-B'}
+    page_info['100000'] = {'diary_id': '100000', 'date': date3, 'title': 'Title-C'}
 
     return page_info
 
@@ -136,5 +136,3 @@ def test_output_index(page_info, tmpdir):
 
     assert filecmp.cmp(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data/expect-index.html'),
                        os.path.join(tmpdir, 'index.html'))
-
-    pass
