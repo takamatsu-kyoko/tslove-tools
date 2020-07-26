@@ -39,6 +39,7 @@ def main():
     output_path = os.path.join(args.output)
     stylesheet_output_path = os.path.join(output_path, 'stylesheet')
     image_output_path = os.path.join(output_path, 'images')
+    script_path = os.path.join(output_path, 'scripts')
     tools_path = os.path.join(output_path, 'tslove-tools')
 
     interval_short = 10
@@ -66,7 +67,7 @@ def main():
         print('Login failed.')
         exit(1)
 
-    directories = [output_path, stylesheet_output_path, image_output_path, tools_path]
+    directories = [output_path, stylesheet_output_path, image_output_path, script_path, tools_path]
     for directory in directories:
         try:
             if not os.path.exists(directory):
@@ -149,6 +150,9 @@ def main():
                     diary_page = BeautifulSoup(web.get_diary_page(diary_id), 'html.parser')
                     image_paths = collect_image_paths(diary_page)
                     fetch_images(web, image_paths, output_path=image_output_path)
+
+                    script_paths = collect_script_paths(diary_page)
+                    fetch_scripts(web, script_paths, output_path=script_path)
 
                     remove_script(diary_page)
                     remove_form_items(diary_page)
@@ -318,10 +322,47 @@ def convert_image_path_to_filename(path):
     return filename
 
 
+def collect_script_paths(soup):
+    paths = set()
+
+    for script_tag in soup.find_all('script', src=True):
+        src = script_tag['src']
+        if not src.startswith('./js/prototype.js') and not src.startswith('./js/Selection.js') and not src == './js/comment.js':
+            paths.add(script_tag['src'])
+
+    return paths
+
+
+def fetch_scripts(web, script_paths, output_path='.', overwrite=False):
+    for path in script_paths:
+        filename = os.path.join(output_path, convert_script_path_to_filename(path))
+        if os.path.exists(filename) and overwrite is False:
+            continue
+
+        try:
+            script = web.get_javascript(path)
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write(script)
+
+        except Exception as e:
+            print('Can not get script {}. {}'.format(path, e))
+            continue
+
+
+def convert_script_path_to_filename(path):
+    return os.path.basename(path)
+
+
 def remove_script(soup):
     script_tags = soup.find_all('script')
     for script_tag in script_tags:
-        script_tag.decompose()
+        if script_tag.has_attr('src'):
+            src = script_tag['src']
+            if src.startswith('./js/prototype.js') or src.startswith('./js/Selection.js') or src == './js/comment.js':
+                script_tag.decompose()
+        else:
+            if 'url2cmd' not in script_tag.string:
+                script_tag.decompose()
 
     a_tags_with_script = soup.find_all('a', onclick=True)
     for a_tag in a_tags_with_script:
@@ -403,6 +444,9 @@ def fix_link(soup, output_path='.'):
                 img_tag['width'] = 120
                 img_tag['height'] = 120
         img_tag['src'] = path
+
+    for script_tag in soup.find_all('script', src=True):
+        script_tag['src'] = 'scripts/' + convert_script_path_to_filename(script_tag['src'])
 
 
 def output_diary(soup, file_name):

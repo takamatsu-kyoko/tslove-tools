@@ -129,6 +129,13 @@ class WebUI:
         else:
             return Image.new("1", (1, 1), 1)
 
+    def get_javascript(self, path):
+        def cond(response):
+            return response.headers['Content-Type'] == 'text/javascript'
+
+        response = self.get_contents(path, cond=cond)
+        return response.text
+
     def get_myprofile_page(self):
         params = {'m': 'pc',
                   'a': 'page_h_prof',
