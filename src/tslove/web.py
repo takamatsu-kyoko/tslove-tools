@@ -78,70 +78,56 @@ class WebUI:
         else:
             return None
 
-    def get_page(self, params):
+    def get_contents(self, path='', params={}, cond=None):
         for count in range(self._retry_count):
             if count != 0:
                 interval = self._retry_interval + (count - 1) * self._retry_additional
-                print('Retry {} after {} sec.'.format(params['a'], interval))
+                msg = 'Retry'
+                msg += ' path:{}'.format(path) if path else ''
+                msg += ' action:{}'.format(params['a']) if 'a' in params else ''
+                msg += ' file:{}'.format(params['filename']) if 'filename' in params else ''
+                msg += ' after {} sec.'.format(interval)
+                print(msg)
                 time.sleep(interval)
 
-            response = requests.get(self.url, headers=self._request_header, params=params, cookies=self._cookies, verify=False, timeout=15)
+            response = requests.get(self.url + path, headers=self._request_header, params=params, cookies=self._cookies, verify=False, timeout=15)
             response.raise_for_status()
 
-            title_pattern = re.compile(r'<title>(?P<title>.+)</title>')
-            result = title_pattern.search(response.text)
-            if result and not result.group('title') == 'ページが表示できませんでした':
+            if cond is None or cond(response):
                 self.last_retries += count
-                return response.text
-
+                return response
         else:
             raise RuntimeError('retry counter expiered')
 
+    def get_page(self, params):
+        def cond(response):
+            title_pattern = re.compile(r'<title>(?P<title>.+)</title>')
+            result = title_pattern.search(response.text)
+            return result and not result.group('title') == 'ページが表示できませんでした'
+
+        response = self.get_contents(params=params, cond=cond)
+        return response.text
+
     def get_stylesheet(self):
-        for count in range(self._retry_count):
-            if count != 0:
-                interval = self._retry_interval + (count - 1) * self._retry_additional
-                print('Retry get stylesheet after {} sec.'.format(interval))
-                time.sleep(interval)
-
-            response = requests.get(self.url + 'xhtml_style.php', headers=self._request_header, cookies=self._cookies, verify=False, timeout=15)
-            response.raise_for_status()
-
+        def cond(response):
             response.encoding = response.apparent_encoding
 
             pattern = re.compile(r'body, div, p, pre, blockquote, th, td,')
-            result = pattern.search(response.text)
-            if result:
-                self.last_retries += count
-                return response.text
+            return pattern.search(response.text)
 
-        else:
-            raise RuntimeError('retry counter expiered')
+        response = self.get_contents(path='xhtml_style.php')
+        return response.text
 
     def get_image(self, path, params=None):
-        for count in range(self._retry_count):
-            if count != 0:
-                interval = self._retry_interval + (count - 1) * self._retry_additional
-                if path == 'img.php':
-                    print('Retry get image(img.php:{}) after {} sec.'.format(params['filename'], interval))
-                else:
-                    print('Retry get image({}) after {} sec.'.format(path, interval))
-                time.sleep(interval)
+        def cond(response):
+            return response.headers['Content-Type'].startswith('image/') or\
+                (response.headers['Content-Type'] == 'text/html' and response.headers['Content-Length'] == '0')
 
-            if path == 'img.php':
-                response = requests.get(self.url + path, headers=self._request_header, params=params, cookies=self._cookies, verify=False, timeout=15)
-            else:
-                response = requests.get(self.url + path, headers=self._request_header, cookies=self._cookies, verify=False, timeout=15)
-            response.raise_for_status()
-
-            if response.headers['Content-Type'].startswith('image/'):
-                self.last_retries += count
-                return Image.open(io.BytesIO(response.content))
-            elif response.headers['Content-Type'] == 'text/html' and response.headers['Content-Length'] == '0':
-                return Image.new("1", (1, 1), 1)
-
+        response = self.get_contents(path, params, cond)
+        if response.headers['Content-Type'].startswith('image/'):
+            return Image.open(io.BytesIO(response.content))
         else:
-            raise RuntimeError('retry counter expiered')
+            return Image.new("1", (1, 1), 1)
 
     def get_myprofile_page(self):
         params = {'m': 'pc',
