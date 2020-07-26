@@ -6,10 +6,12 @@ import re
 import os
 import time
 import datetime
+import json
 
 import tslove.web
 
 DIARY_ID_PATTERN = re.compile(r'\./\?m=pc&a=page_fh_diary&target_c_diary_id=(?P<id>[0-9]+)')
+FIXED_DIARY_ID_PATTERN = re.compile(r'\./(?P<id>[0-9]+).html')
 URL_PATTERN = re.compile(r'url\((?P<path>.+)\)')
 
 
@@ -37,12 +39,12 @@ def main():
     output_path = os.path.join(args.output)
     stylesheet_output_path = os.path.join(output_path, 'stylesheet')
     image_output_path = os.path.join(output_path, 'images')
+    script_path = os.path.join(output_path, 'scripts')
+    tools_path = os.path.join(output_path, 'tslove-tools')
 
     interval_short = 10
     interval_long = 20
     interval_change_timing = 5
-
-    page_info = []
 
     login = False
     try:
@@ -65,7 +67,7 @@ def main():
         print('Login failed.')
         exit(1)
 
-    directories = [output_path, stylesheet_output_path, image_output_path]
+    directories = [output_path, stylesheet_output_path, image_output_path, script_path, tools_path]
     for directory in directories:
         try:
             if not os.path.exists(directory):
@@ -74,14 +76,16 @@ def main():
             print('Can not create directory {}. {}'.format(directory, e))
             exit(1)
 
-    try:
-        stylesheet = web.get_stylesheet()
-        image_paths = collect_stylesheet_image_paths(stylesheet)
-        fetch_stylesheet_images(web, image_paths, output_path=stylesheet_output_path)
-        output_stylesheet(stylesheet, output_path=stylesheet_output_path)
-    except Exception as e:
-        print('Can not get stylesheet. {}'.format(e))
-        exit(1)
+    stylesheet_file_name = os.path.join(stylesheet_output_path, 'tslove.css')
+    if not os.path.exists(stylesheet_file_name):
+        try:
+            stylesheet = web.get_stylesheet()
+            image_paths = collect_stylesheet_image_paths(stylesheet)
+            fetch_stylesheet_images(web, image_paths, output_path=stylesheet_output_path)
+            output_stylesheet(stylesheet, stylesheet_file_name)
+        except Exception as e:
+            print('Can not get stylesheet. {}'.format(e))
+            exit(1)
 
     if diary_id_from is None:
         try:
@@ -95,70 +99,128 @@ def main():
     else:
         diary_id = diary_id_from
 
-    contents = None
+    page_info = {}
+
+    page_info_path = os.path.join(tools_path, 'page_info.json')
+    if os.path.exists(page_info_path):
+        try:
+            page_info = load_page_info(page_info_path)
+        except Exception as e:
+            print('Can not load page info {}. {}'.format(page_info_path, e))
+            exit(1)
+
+    first_download = True
     no_retry_count = 0
     interval = interval_long
+    use_page_info = 0
 
     while diary_id:
-        try:
-            if contents:
-                time.sleep(interval)
+        try:  # KeyBoardinterrupt
 
-            web.last_retries = 0
+            file_name = os.path.join(output_path, '{}.html'.format(diary_id))
+            if os.path.exists(file_name):
+                if diary_id not in page_info:
+                    source = 'local'
+                    try:
+                        with open(file_name, 'r') as f:
+                            diary_page = BeautifulSoup(f, 'html.parser')
+                    except Exception as e:
+                        print('Processing diary id {} failed. (local) {}'.format(diary_id, e))
+                        exit(1)
+                else:
+                    source = 'page_info'
+                    use_page_info += 1
 
-            diary_page = BeautifulSoup(web.get_diary_page(diary_id), 'html.parser')
+                    if diary_id == diary_id_to or page_info[diary_id]['prev_diary_id'] is None:
+                        break
+
+                    diary_id = page_info[diary_id]['prev_diary_id']
+                    continue
+
+            else:
+                source = 'remote'
+                try:
+                    if not first_download:
+                        time.sleep(interval)
+                    else:
+                        first_download = False
+
+                    web.last_retries = 0
+
+                    diary_page = BeautifulSoup(web.get_diary_page(diary_id), 'html.parser')
+                    image_paths = collect_image_paths(diary_page)
+                    fetch_images(web, image_paths, output_path=image_output_path)
+
+                    script_paths = collect_script_paths(diary_page)
+                    fetch_scripts(web, script_paths, output_path=script_path)
+
+                    remove_script(diary_page)
+                    remove_form_items(diary_page)
+                    fix_link(diary_page, output_path=output_path)
+
+                    output_diary(diary_page, file_name)
+
+                    if web.last_retries == 0:
+                        no_retry_count += 1
+                    else:
+                        no_retry_count = 0
+
+                    if no_retry_count > interval_change_timing and not interval == interval_short:
+                        print('interval changes {} sec. to {} sec.'.format(interval, interval_short))
+                        interval = interval_short
+                    if no_retry_count <= interval_change_timing and not interval == interval_long:
+                        print('interval changes {} sec. to {} sec.'.format(interval, interval_long))
+                        interval = interval_long
+
+                except Exception as e:
+                    print('Processing diary id {} failed. {}'.format(diary_id, e))
+                    exit(1)
+
             contents = collect_contents(diary_page)
             contents['diary_id'] = diary_id
 
-            image_paths = collect_image_paths(diary_page)
-            fetch_images(web, image_paths, output_path=image_output_path)
+            page_info[diary_id] = contents
 
-            remove_script(diary_page)
-            remove_form_items(diary_page)
-            fix_link(diary_page, output_path=output_path)
+            print('diary id {} ({}:{}) processed.{}'.format(diary_id,
+                                                            contents['date'].strftime('%Y-%m-%d'),
+                                                            contents['title'],
+                                                            '' if source == 'remote' else ' (local)'))
 
-            output_diary(diary_id, contents, diary_page, output_path=output_path)
+            if diary_id == diary_id_to or contents['prev_diary_id'] is None:
+                break
 
-            page_info.append(contents)
-        except Exception as e:
-            print('Processing diary id {} failed. {}'.format(diary_id, e))
-            exit(1)
+            diary_id = contents['prev_diary_id']
+
         except KeyboardInterrupt:
             break
 
-        print('diary id {} ({}:{}) processed.'.format(diary_id, contents['date'].strftime('%Y-%m-%d'), contents['title']))
+    try:
+        save_page_info(page_info, page_info_path)
+    except Exception as e:
+        print('Can not save page info {}. {}'.format(page_info_path, e))
 
-        if diary_id == diary_id_to:
-            break
+    try:
+        output_index(page_info, output_path=output_path)
+    except Exception as e:
+        print('Can not save index file. {}'.format(e))
+        exit(1)
 
-        diary_id = contents['prev_diary_id']
-
-        if web.last_retries == 0:
-            no_retry_count += 1
-        else:
-            no_retry_count = 0
-
-        if diary_id and no_retry_count > interval_change_timing and not interval == interval_short:
-            print('interval changes {} sec. to {} sec.'.format(interval, interval_short))
-            interval = interval_short
-        if diary_id and no_retry_count <= interval_change_timing and not interval == interval_long:
-            print('interval changes {} sec. to {} sec.'.format(interval, interval_long))
-            interval = interval_long
-
-    output_index(page_info, output_path=output_path)
-    print('done.')
+    if use_page_info:
+        print('done. (skip {} diaries)'.format(use_page_info))
+    else:
+        print('done.')
 
 
 def collect_contents(soup):
     contents = {}
-    contents['title'] = str(soup.find('p', class_='heading').string)
+    contents['title'] = str(soup.find('p', class_='heading').get_text(strip=True))
 
-    date = str(soup.find('div', class_='dparts diaryDetailBox').div.dl.dt.get_text())
+    date = str(soup.find('div', class_='dparts diaryDetailBox').div.dl.dt.get_text(strip=True))
     contents['date'] = datetime.datetime.strptime(date, '%Y年%m月%d日%H:%M')
 
     result = soup.find('p', class_='prev')
     if result:
-        result = DIARY_ID_PATTERN.match(result.a['href'])
+        result = FIXED_DIARY_ID_PATTERN.match(result.a['href'])
 
     if result:
         contents['prev_diary_id'] = result.group('id')
@@ -208,8 +270,7 @@ def convert_stylesheet_image_path_to_filename(path):
     return filename
 
 
-def output_stylesheet(stylesheet, output_path='.'):
-    file_name = os.path.join(output_path, 'tslove.css')
+def output_stylesheet(stylesheet, file_name):
     with open(file_name, 'w', encoding='utf-8') as f:
         for line in stylesheet.splitlines():
             result = URL_PATTERN.search(line)
@@ -261,10 +322,47 @@ def convert_image_path_to_filename(path):
     return filename
 
 
+def collect_script_paths(soup):
+    paths = set()
+
+    for script_tag in soup.find_all('script', src=True):
+        src = script_tag['src']
+        if not src.startswith('./js/prototype.js') and not src.startswith('./js/Selection.js') and not src == './js/comment.js':
+            paths.add(script_tag['src'])
+
+    return paths
+
+
+def fetch_scripts(web, script_paths, output_path='.', overwrite=False):
+    for path in script_paths:
+        filename = os.path.join(output_path, convert_script_path_to_filename(path))
+        if os.path.exists(filename) and overwrite is False:
+            continue
+
+        try:
+            script = web.get_javascript(path)
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write(script)
+
+        except Exception as e:
+            print('Can not get script {}. {}'.format(path, e))
+            continue
+
+
+def convert_script_path_to_filename(path):
+    return os.path.basename(path)
+
+
 def remove_script(soup):
     script_tags = soup.find_all('script')
     for script_tag in script_tags:
-        script_tag.decompose()
+        if script_tag.has_attr('src'):
+            src = script_tag['src']
+            if src.startswith('./js/prototype.js') or src.startswith('./js/Selection.js') or src == './js/comment.js':
+                script_tag.decompose()
+        else:
+            if 'url2cmd' not in script_tag.string:
+                script_tag.decompose()
 
     a_tags_with_script = soup.find_all('a', onclick=True)
     for a_tag in a_tags_with_script:
@@ -347,11 +445,28 @@ def fix_link(soup, output_path='.'):
                 img_tag['height'] = 120
         img_tag['src'] = path
 
+    for script_tag in soup.find_all('script', src=True):
+        script_tag['src'] = 'scripts/' + convert_script_path_to_filename(script_tag['src'])
 
-def output_diary(diary_id, contents, soup, output_path='.'):
-    file_name = os.path.join(output_path, '{}.html'.format(diary_id))
+
+def output_diary(soup, file_name):
     with open(file_name, 'w', encoding='utf-8') as f:
         f.write(soup.prettify(formatter=None))
+
+
+def load_page_info(file_name):
+    def convert_datetime(dct):
+        if 'date' in dct:
+            dct['date'] = datetime.datetime.strptime(dct['date'], '%Y-%m-%d %H:%M:%S')
+        return dct
+
+    with open(file_name, 'r', encoding='utf-8') as f:
+        return json.load(f, object_hook=convert_datetime)
+
+
+def save_page_info(page_info, file_name):
+    with open(file_name, 'w', encoding='utf-8') as f:
+        json.dump(page_info, f, ensure_ascii=False, indent=2, default=str)
 
 
 def output_index(page_info, output_path='.'):
@@ -374,15 +489,15 @@ def output_index(page_info, output_path='.'):
     soup = BeautifulSoup(template, 'html.parser')
     table_tag = soup.table
 
-    for info in page_info:
+    for diary_id in sorted(page_info.keys(), reverse=True):
         tr_tag = soup.new_tag('tr')
         date_td_tag = soup.new_tag('td')
-        date_td_tag.string = info['date'].strftime('%Y年%m月%d日%H:%M')
+        date_td_tag.string = page_info[diary_id]['date'].strftime('%Y年%m月%d日%H:%M')
         tr_tag.append(date_td_tag)
         title_td_tag = soup.new_tag('td')
         title_a_tag = soup.new_tag('a')
-        title_a_tag['href'] = './{}.html'.format(info['diary_id'])
-        title_a_tag.string = info['title']
+        title_a_tag['href'] = './{}.html'.format(page_info[diary_id]['diary_id'])
+        title_a_tag.string = page_info[diary_id]['title']
         title_td_tag.append(title_a_tag)
         tr_tag.append(title_td_tag)
         table_tag.append(tr_tag)
