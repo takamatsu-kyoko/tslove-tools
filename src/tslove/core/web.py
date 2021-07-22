@@ -20,7 +20,7 @@ RETRY_INTERVAL = 10
 RETRY_ADDITIONAL = 5
 
 
-class WebUI:
+class TsLoveWeb:
     '''T'sLove webアクセスクラス'''
 
     def __init__(self, url: str = 'https://tslove.net/'):
