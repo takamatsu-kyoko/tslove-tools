@@ -8,7 +8,7 @@ import time
 import datetime
 import json
 
-import tslove.web
+from tslove.core.web import TsLoveWeb
 
 DIARY_ID_PATTERN = re.compile(r'\./\?m=pc&a=page_fh_diary&target_c_diary_id=(?P<id>[0-9]+)')
 FIXED_DIARY_ID_PATTERN = re.compile(r'\./(?P<id>[0-9]+).html')
@@ -24,7 +24,7 @@ def main():
     parser.add_argument('--php-session-id', metavar='', help='for debug', default=None)
     args = parser.parse_args()
 
-    web = tslove.web.WebUI(url='https://tslove.net/')
+    web = TsLoveWeb(url='https://tslove.net/')
     php_session_id = args.php_session_id
 
     diary_id_from, diary_id_to = vars(args)['from'], args.to  # from is keyword
