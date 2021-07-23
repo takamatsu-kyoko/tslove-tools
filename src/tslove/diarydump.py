@@ -145,8 +145,6 @@ def main():
                     else:
                         first_download = False
 
-                    web.last_retries = 0
-
                     diary_page = BeautifulSoup(web.get_diary_page(diary_id), 'html.parser')
                     image_paths = collect_image_paths(diary_page)
                     fetch_images(web, image_paths, output_path=image_output_path)
@@ -160,7 +158,8 @@ def main():
 
                     output_diary(diary_page, file_name)
 
-                    if web.last_retries == 0:
+                    # FIXME: 最後のリクエストの再試行回数だけが反映されてます
+                    if web.retry_count == 0:
                         no_retry_count += 1
                     else:
                         no_retry_count = 0
