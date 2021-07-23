@@ -24,18 +24,36 @@ RETRY_ADDITIONAL = 5
 class TsLoveWeb:
     '''T'sLove webアクセスクラス'''
 
+    __instance = None
+    __instance_initialized = False
+
+    @classmethod
+    def get_instance(cls):
+        '''TsLoveWebのインスタンスを取得する'''
+        if cls.__instance:
+            return cls.__instance
+
+        return cls()
+
+    def __new__(cls, url: str = ''):  # pylint: disable=W0613
+        if cls.__instance is None:
+            cls.__instance = super(TsLoveWeb, cls).__new__(cls)
+        return cls.__instance
+
     def __init__(self, url: str = 'https://tslove.net/'):
         '''
         :param url: T'sLove の起点URL
         '''
-        self.__url = url
-        self.__session = requests.Session()
-        self.__session.headers.update({
-            'User-Agent': 'tslove-tools written by T.Kyoko (tslove member_id=45642)'})
-        self.__php_session_id: Optional[str] = None
-        self.__sns_session_id: Optional[str] = None
+        if not self.__instance_initialized:
+            self.__url = url
+            self.__session = requests.Session()
+            self.__session.headers.update({
+                'User-Agent': 'tslove-tools written by T.Kyoko (tslove member_id=45642)'})
+            self.__php_session_id: Optional[str] = None
+            self.__sns_session_id: Optional[str] = None
 
-        self.__retry_count = 0
+            self.__retry_count = 0
+            self.__instance_initialized = True
 
     def __del__(self):
         self.__session.close()
