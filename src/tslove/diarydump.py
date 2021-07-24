@@ -9,9 +9,10 @@ import datetime
 import json
 
 from tslove.core.web import TsLoveWeb
+from tslove.core.page import Page
+from tslove.core.diary import DiaryPage
 
 DIARY_ID_PATTERN = re.compile(r'\./\?m=pc&a=page_fh_diary&target_c_diary_id=(?P<id>[0-9]+)')
-FIXED_DIARY_ID_PATTERN = re.compile(r'\./(?P<id>[0-9]+).html')
 URL_PATTERN = re.compile(r'url\((?P<path>.+)\)')
 
 
@@ -89,7 +90,7 @@ def main():
 
     if diary_id_from is None:
         try:
-            profile_page = BeautifulSoup(web.get_myprofile_page(), 'html.parser')
+            profile_page = BeautifulSoup(Page.fetch_from_web('page_h_prof').get_html_page(0), 'html.parser')
             diary_list = profile_page.find('ul', class_='articleList')
             result = DIARY_ID_PATTERN.match(diary_list.a['href'])
             diary_id = result.group('id')
@@ -123,7 +124,7 @@ def main():
                     source = 'local'
                     try:
                         with open(file_name, 'r') as f:
-                            diary_page = BeautifulSoup(f, 'html.parser')
+                            diary_page = DiaryPage.read_from_file(f)
                     except Exception as e:
                         print('Processing diary id {} failed. (local) {}'.format(diary_id, e))
                         exit(1)
@@ -145,18 +146,19 @@ def main():
                     else:
                         first_download = False
 
-                    diary_page = BeautifulSoup(web.get_diary_page(diary_id), 'html.parser')
-                    image_paths = collect_image_paths(diary_page)
+                    diary_page = DiaryPage.fetch_from_web(diary_id)
+                    image_paths = diary_page.list_image_path()
                     fetch_images(web, image_paths, output_path=image_output_path)
 
-                    script_paths = collect_script_paths(diary_page)
+                    script_paths = diary_page.list_script_path()
                     fetch_scripts(web, script_paths, output_path=script_path)
 
-                    remove_script(diary_page)
-                    remove_form_items(diary_page)
-                    fix_link(diary_page, output_path=output_path)
+                    remove_script(diary_page.soup0)
+                    remove_form_items(diary_page.soup0)
+                    fix_link(diary_page.soup0, output_path=output_path)
 
-                    output_diary(diary_page, file_name)
+                    with open(file_name, 'w', encoding='utf-8') as file:
+                        diary_page.write_to_file(file)
 
                     # FIXME: 最後のリクエストの再試行回数だけが反映されてます
                     if web.retry_count == 0:
@@ -175,8 +177,12 @@ def main():
                     print('Processing diary id {} failed. {}'.format(diary_id, e))
                     exit(1)
 
-            contents = collect_contents(diary_page)
-            contents['diary_id'] = diary_id
+            contents = {
+                'title': diary_page.title,
+                'date': diary_page.date,
+                'prev_diary_id': diary_page.prev_diary_id,
+                'diary_id': diary_id
+            }
 
             page_info[diary_id] = contents
 
@@ -208,25 +214,6 @@ def main():
         print('done. (skip {} diaries)'.format(use_page_info))
     else:
         print('done.')
-
-
-def collect_contents(soup):
-    contents = {}
-    contents['title'] = str(soup.find('p', class_='heading').get_text(strip=True))
-
-    date = str(soup.find('div', class_='dparts diaryDetailBox').div.dl.dt.get_text(strip=True))
-    contents['date'] = datetime.datetime.strptime(date, '%Y年%m月%d日%H:%M')
-
-    result = soup.find('p', class_='prev')
-    if result:
-        result = FIXED_DIARY_ID_PATTERN.match(result.a['href'])
-
-    if result:
-        contents['prev_diary_id'] = result.group('id')
-    else:
-        contents['prev_diary_id'] = None
-
-    return contents
 
 
 def collect_stylesheet_image_paths(stylesheet):
@@ -280,18 +267,12 @@ def output_stylesheet(stylesheet, file_name):
             f.write(line + '\n')
 
 
-def collect_image_paths(soup):
-    paths = set()
-    for img_tag in soup.find_all('img'):
-        if '://' not in img_tag['src']:
-            paths.add(img_tag['src'])
-
-    return paths
-
-
 def fetch_images(web, image_paths, output_path='.', overwrite=False):
 
     for path in image_paths:
+        if '://' in path:
+            continue
+
         filename = os.path.join(output_path, convert_image_path_to_filename(path))
         if os.path.exists(filename) and overwrite is False:
             continue
@@ -321,19 +302,12 @@ def convert_image_path_to_filename(path):
     return filename
 
 
-def collect_script_paths(soup):
-    paths = set()
-
-    for script_tag in soup.find_all('script', src=True):
-        src = script_tag['src']
-        if not src.startswith('./js/prototype.js') and not src.startswith('./js/Selection.js') and not src == './js/comment.js':
-            paths.add(script_tag['src'])
-
-    return paths
-
-
 def fetch_scripts(web, script_paths, output_path='.', overwrite=False):
     for path in script_paths:
+
+        if path.startswith('./js/prototype.js') or path.startswith('./js/Selection.js') or path == './js/comment.js':
+            continue
+
         filename = os.path.join(output_path, convert_script_path_to_filename(path))
         if os.path.exists(filename) and overwrite is False:
             continue
@@ -446,11 +420,6 @@ def fix_link(soup, output_path='.'):
 
     for script_tag in soup.find_all('script', src=True):
         script_tag['src'] = 'scripts/' + convert_script_path_to_filename(script_tag['src'])
-
-
-def output_diary(soup, file_name):
-    with open(file_name, 'w', encoding='utf-8') as f:
-        f.write(soup.prettify(formatter=None))
 
 
 def load_page_info(file_name):
