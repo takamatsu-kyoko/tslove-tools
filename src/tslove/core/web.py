@@ -12,7 +12,7 @@ from typing import Optional, Callable
 import requests
 from PIL import Image  # type: ignore
 
-from tslove.core.exception import RetryCountExceededError
+from tslove.core.exception import RequestError, RetryCountExceededError
 
 warnings.filterwarnings('ignore', 'Unverified HTTPS request is being made.')
 
@@ -85,7 +85,7 @@ class TsLoveWeb:
         :param request: リクエストを発行する関数
         :param message: リトライメッセージを生成する関数
         :returns: request.Respose オブジェクト
-        :raises RequestException: requetsの処理に失敗した場合
+        :raises RecuestError: requetsの処理に失敗した場合
         :raises RetryCountExceededError: リトライ回数が基準を超過した場合
 
         '''
@@ -95,8 +95,10 @@ class TsLoveWeb:
                 if message:
                     print(message(interval))
                 time.sleep(interval)
-
-            response = request()
+            try:
+                response = request()
+            except requests.RequestException as err:
+                raise RequestError from err
             if response.ok:
                 return response
 
@@ -110,7 +112,7 @@ class TsLoveWeb:
         :param path: url path
         :param params: クエリパラメータ
         :returns: requests.Response オブジェクト
-        :raises RequestException: requetsの処理に失敗した場合
+        :raises RecuestError: requetsの処理に失敗した場合
         :raises RetryCountExceededError: リトライ回数が基準を超過した場合
         '''
         def request() -> requests.Response:
@@ -134,7 +136,7 @@ class TsLoveWeb:
         :param path: url path
         :param payload: POSTデータ
         :returns: requests.Response オブジェクト
-        :raises RequestException: requetsの処理に失敗した場合
+        :raises RecuestError: requetsの処理に失敗した場合
         :raises RetryCountExceededError: リトライ回数が基準を超過した場合
         '''
         def request() -> requests.Response:
@@ -162,7 +164,7 @@ class TsLoveWeb:
         :param password: パスワード
         :param php_session_id: PHPSESSID
         :return: sns_session_idを取得できた場合 True
-        :raises RequestException: requetsの処理に失敗した場合
+        :raises RecuestError: requetsの処理に失敗した場合
         :raises RetryCountExceededError: リトライ回数が基準を超過した場合
         '''
         if php_session_id is None:
@@ -186,7 +188,7 @@ class TsLoveWeb:
         :param username: ユーザ名
         :param password: パスワード
         :return: PHPSESSID もしくは None
-        :raises RequestException: requetsの処理に失敗した場合
+        :raises RecuestError: requetsの処理に失敗した場合
         :raises RetryCountExceededError: リトライ回数が基準を超過した場合
         '''
         payload = {'username': username,
@@ -215,7 +217,7 @@ class TsLoveWeb:
         マイページ確認ページを取得してログアウトのリンクから session_id を取得します
 
         :return: session_id もしくは None
-        :raises RequestException: requetsの処理に失敗した場合
+        :raises RecuestError: requetsの処理に失敗した場合
         :raises RetryCountExceededError: リトライ回数が基準を超過した場合
         '''
         session_id_pattern = re.compile(r'a=do_inc_page_header_logout&amp;sessid=(?P<session_id>.+)"')
@@ -236,7 +238,7 @@ class TsLoveWeb:
 
         :param params: クエリパラメータ
         :return: ページの内容
-        :raises RequestException: requetsの処理に失敗した場合
+        :raises RecuestError: requetsの処理に失敗した場合
         :raises RetryCountExceededError: リトライ回数が基準を超過した場合
         '''
         self.__retry_count = 0
@@ -259,7 +261,7 @@ class TsLoveWeb:
         '''スタイルシートを取得します
 
         :return: スタイルシートの内容
-        :raises RequestException: requetsの処理に失敗した場合
+        :raises RecuestError: requetsの処理に失敗した場合
         :raises RetryCountExceededError: リトライ回数が基準を超過した場合
         '''
         self.__retry_count = 0
@@ -281,7 +283,7 @@ class TsLoveWeb:
         :param path: url path
         :param params: クエリパラメータ
         :return: PIL Image オブジェクト
-        :raises RequestException: requetsの処理に失敗した場合
+        :raises RequestError: requetsの処理に失敗した場合
         :raises RetryCountExceededError: リトライ回数が基準を超過した場合
         '''
         self.__retry_count = 0
@@ -302,7 +304,7 @@ class TsLoveWeb:
 
         :param path: url path
         :return: JavaScriptファイルの内容
-        :raises RequestException: requetsの処理に失敗した場合
+        :raises RequestError: requetsの処理に失敗した場合
         :raises RetryCountExceededError: リトライ回数が基準を超過した場合
         '''
         self.__retry_count = 0
