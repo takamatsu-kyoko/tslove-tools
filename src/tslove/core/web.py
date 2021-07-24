@@ -316,37 +316,3 @@ class TsLoveWeb:
                 return response.text
 
             self.__retry_count += 1
-
-    # TODO: 別モジュールへ移す
-    def get_myprofile_page(self) -> str:
-        '''マイページ確認ページを取得します
-
-        :return: ページの内容
-        :raises RetryCountExceededError: リトライ回数が基準を超過した場合
-        '''
-        params = {'m': 'pc',
-                  'a': 'page_h_prof',
-                  }
-        return self.get_page(params)
-
-    # TODO: 別モジュールへ移す
-    def get_diary_page(self, diary_id: str) -> str:
-        '''日記を取得します
-
-        :param diary_id: diary_id
-        :return: 日記の内容
-        :raises RuntimeErorr: 指定したdiary_idの日記が見つからなかった場合
-        '''
-        params = {'m': 'pc',
-                  'a': 'page_fh_diary',
-                  'target_c_diary_id': diary_id,
-                  'order': 'asc',
-                  'page_size': 100
-                  }
-        page = self.get_page(params)
-
-        error_pattern = re.compile(r'<td>該当する日記が見つかりません。</td>')
-        if error_pattern.search(page):
-            raise RuntimeError('No such diary')
-
-        return page
