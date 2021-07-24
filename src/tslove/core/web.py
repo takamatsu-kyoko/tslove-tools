@@ -53,6 +53,7 @@ class TsLoveWeb:
             self.__sns_session_id: Optional[str] = None
 
             self.__retry_count = 0
+            self.__total_retries = 0
             self.__instance_initialized = True
 
     def __del__(self):
@@ -69,9 +70,9 @@ class TsLoveWeb:
         return self.__sns_session_id
 
     @property
-    def retry_count(self) -> int:
-        '''retry_count'''
-        return self.__retry_count
+    def total_retries(self) -> int:
+        '''total_retries'''
+        return self.__total_retries
 
     def __request(self, request: Callable, message: Callable = None) -> requests.Response:
         '''T'sLoveへリクエストを発行します
@@ -95,6 +96,7 @@ class TsLoveWeb:
                 if message:
                     print(message(interval))
                 time.sleep(interval)
+                self.__total_retries += 1
             try:
                 response = request()
             except requests.RequestException as err:

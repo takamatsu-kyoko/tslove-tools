@@ -146,6 +146,8 @@ def main():
                     else:
                         first_download = False
 
+                    retry_count = web.total_retries
+
                     diary_page = DiaryPage.fetch_from_web(diary_id)
                     image_paths = diary_page.list_image_path()
                     fetch_images(web, image_paths, output_path=image_output_path)
@@ -160,8 +162,7 @@ def main():
                     with open(file_name, 'w', encoding='utf-8') as file:
                         diary_page.write_to_file(file)
 
-                    # FIXME: 最後のリクエストの再試行回数だけが反映されてます
-                    if web.retry_count == 0:
+                    if web.total_retries == retry_count:
                         no_retry_count += 1
                     else:
                         no_retry_count = 0
