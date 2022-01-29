@@ -122,7 +122,7 @@ def main():
                 if diary_id not in page_info:
                     source = 'local'
                     try:
-                        with open(file_name, 'r') as f:
+                        with open(file_name, 'r', encoding='utf-8') as f:
                             diary_page = BeautifulSoup(f, 'html.parser')
                     except Exception as e:
                         print('Processing diary id {} failed. (local) {}'.format(diary_id, e))
