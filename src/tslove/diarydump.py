@@ -489,7 +489,7 @@ def output_index(page_info, output_path='.'):
     soup = BeautifulSoup(template, 'html.parser')
     table_tag = soup.table
 
-    for diary_id in sorted(page_info.keys(), reverse=True):
+    for diary_id in sorted(page_info.keys(), key=int, reverse=True):
         tr_tag = soup.new_tag('tr')
         date_td_tag = soup.new_tag('td')
         date_td_tag.string = page_info[diary_id]['date'].strftime('%Y年%m月%d日%H:%M')
