@@ -37,17 +37,6 @@ class Page:
         page.add_page(html)
         return page
 
-    @classmethod
-    def read_from_file(cls, file):
-        '''ファイルオブジェクトからページを取得します
-
-        :param file: ファイルオブジェクト'''
-        html = file.read()
-
-        page = Page()
-        page.add_page(html)
-        return page
-
     def __init__(self):
         self._html: List[str] = []
         self.__image_paths: Set[str] = set()

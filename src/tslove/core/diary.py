@@ -40,17 +40,6 @@ class DiaryPage(Page):
         page.add_page(html)
         return page
 
-    @classmethod
-    def read_from_file(cls, file):
-        '''ファイルオブジェクトから日記ページを取得します。
-
-        :param file: ファイルオブジェクト'''
-        html = file.read()
-
-        page = DiaryPage()
-        page.add_page(html)
-        return page
-
     def __init__(self):
         super().__init__()
         self.__title: str = ''

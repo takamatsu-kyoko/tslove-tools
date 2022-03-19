@@ -80,9 +80,10 @@ def main():
             if os.path.exists(file_name):
                 if diary_id not in page_info:
                     source = 'local'
+                    diary_page = DiaryPage()
                     try:
                         with open(file_name, 'r', encoding='utf-8') as file:
-                            diary_page = DiaryPage.read_from_file(file)
+                            diary_page.append(file.read())
                     except OSError as err:
                         print('Processing diary id {} failed. (local) {}'.format(diary_id, err))
                         sys.exit(1)
