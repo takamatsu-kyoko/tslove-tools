@@ -311,18 +311,20 @@ def output_stylesheet(stylesheet, file_name):
 def dump_diary(web, config, diary_id, file_name):
     '''日記をダンプします'''
     diary_page = DiaryPage.fetch_from_web(diary_id)
-    image_paths = diary_page.list_image_path()
+    image_paths = diary_page.image_paths
     fetch_images(web, image_paths, output_path=config.output_path['image'])
 
-    script_paths = diary_page.list_script_path()
+    script_paths = diary_page.script_paths
     fetch_scripts(web, script_paths, output_path=config.output_path['script'])
 
-    remove_script(diary_page.soup0)
-    remove_form_items(diary_page.soup0)
-    fix_link(diary_page.soup0, output_path=config.output_path['base'])
+    soup = BeautifulSoup(diary_page.get_html_page(0), 'html.parser')
+
+    remove_script(soup)
+    remove_form_items(soup)
+    fix_link(soup, output_path=config.output_path['base'])
 
     with open(file_name, 'w', encoding='utf-8') as file:
-        diary_page.write_to_file(file)
+        file.write(soup.prettify(formatter=None))
 
     return diary_page
 

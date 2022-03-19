@@ -38,7 +38,6 @@ class DiaryPage(Page):
 
         page = DiaryPage()
         page.add_page(html)
-        page.parse()
         return page
 
     @classmethod
@@ -50,7 +49,6 @@ class DiaryPage(Page):
 
         page = DiaryPage()
         page.add_page(html)
-        page.parse()
         return page
 
     def __init__(self):
@@ -74,30 +72,21 @@ class DiaryPage(Page):
         '''一つ前の日記のdiary_id'''
         return self.__prev_diary_id
 
-    @property
-    def soup0(self) -> BeautifulSoup:
-        '''0番目のsoup'''
-        # TODO コンテンツ書き換えの仕組みを考えたら廃止します
-        return self._soup[0]
-
-    def parse(self):
+    def _parse(self, soup: BeautifulSoup):
         '''日記ページをパースしてプロパティをセットします'''
-        for soup in self._soup:
+        super()._parse(soup)
+
+        if not self.__title:
             self.__title = str(soup.find('p', class_='heading').get_text(strip=True))
 
+        if not self.__date:
             date_str = str(soup.find('div', class_='dparts diaryDetailBox').div.dl.dt.get_text(strip=True))
             self.__date = datetime.strptime(date_str, '%Y年%m月%d日%H:%M')
 
+        if not self.__prev_diary_id:
             prev_paragraph = soup.find('p', class_='prev')
             if prev_paragraph:
                 pattern = re.compile(r'target_c_diary_id=(?P<id>[0-9]+)')
                 result = pattern.search(prev_paragraph.a['href'])
                 if result:
                     self.__prev_diary_id = result.group('id')
-
-    def write_to_file(self, file):
-        '''ファイルへ書き出します
-
-        :param file: ファイルオブジェクト
-        '''
-        file.write(self._soup[0].prettify(formatter=None))

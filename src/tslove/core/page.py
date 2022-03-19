@@ -50,12 +50,23 @@ class Page:
 
     def __init__(self):
         self._html: List[str] = []
-        self._soup: List[BeautifulSoup] = []
+        self.__image_paths: Set[str] = set()
+        self.__script_paths: Set[str] = set()
 
     @property
     def page_count(self) -> int:
         '''htmlのページ数'''
         return len(self._html)
+
+    @property
+    def image_paths(self) -> Set[str]:
+        '''imgタグのsrcの内容の集合'''
+        return self.__image_paths
+
+    @property
+    def script_paths(self) -> Set[str]:
+        '''scriptタグのsrcの内容の集合'''
+        return self.__script_paths
 
     def add_page(self, html: str):
         '''ページを追加します
@@ -63,7 +74,7 @@ class Page:
         :param html_page: HTMLページ
         '''
         self._html.append(html)
-        self._soup.append(BeautifulSoup(html, 'html.parser'))
+        self._parse(BeautifulSoup(html, 'html.parser'))
 
     def get_html_page(self, page_num: int) -> str:
         '''htmlページの内容を取得します
@@ -73,31 +84,11 @@ class Page:
         '''
         return self._html[page_num]
 
-    def list_image_path(self) -> Set[str]:
-        '''imgタグのsrcの内容をリストします
+    def _parse(self, soup: BeautifulSoup) -> None:
+        '''ページをパースしてプロパティをセットします'''
 
-        :return: imgタグのsrc
-        '''
-        path: Set[str] = set()
-        for soup in self._soup:
-            for img_tag in soup.find_all('img'):
-                path.add(img_tag['src'])
-        return path
+        for img_tag in soup.find_all('img'):
+            self.__image_paths.add(img_tag['src'])
 
-    def list_script_path(self) -> Set[str]:
-        '''scriptタグのsrcの内容をリストします
-
-        :return: scriptタグのsrc
-        '''
-        path: Set[str] = set()
-        for soup in self._soup:
-            for script_tag in soup.find_all('script', src=True):
-                path.add(script_tag['src'])
-        return path
-
-    def write_to_file(self, file):
-        '''ファイルへ書き出します
-
-        :param file: ファイルオブジェクト
-        '''
-        raise NotImplementedError
+        for script_tag in soup.find_all('script', src=True):
+            self.__script_paths.add(script_tag['src'])
