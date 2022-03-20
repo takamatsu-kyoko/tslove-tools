@@ -39,8 +39,8 @@ class OutputPath(TypedDict):
 @dataclass
 class Config:
     '''コンフィグ'''
-    diary_id_from: str
-    diary_id_to: str
+    diary_id_from: Optional[str]
+    diary_id_to: Optional[str]
     output_path: OutputPath
     echo_password: bool
     show_session_id: bool
