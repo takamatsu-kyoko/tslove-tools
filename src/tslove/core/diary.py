@@ -37,7 +37,7 @@ class DiaryPage(Page):
             raise NoSuchDiaryError
 
         page = DiaryPage()
-        page.add_page(html)
+        page.append(html)
         return page
 
     def __init__(self):

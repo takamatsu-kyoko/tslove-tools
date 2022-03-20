@@ -230,7 +230,7 @@ def check_first_diary_id(config):
     '''最初にダウンロードする日記を取得します'''
     if config.diary_id_from is None:
         try:
-            profile_page = BeautifulSoup(Page.fetch_from_web('page_h_prof').get_html_page(0), 'html.parser')
+            profile_page = BeautifulSoup(Page.fetch_from_web('page_h_prof')[0], 'html.parser')
             diary_list = profile_page.find('ul', class_='articleList')
             result = DIARY_ID_PATTERN.match(diary_list.a['href'])
             return result.group('id')
@@ -318,7 +318,7 @@ def dump_diary(web, config, diary_id, file_name):
     script_paths = diary_page.script_paths
     fetch_scripts(web, script_paths, output_path=config.output_path['script'])
 
-    soup = BeautifulSoup(diary_page.get_html_page(0), 'html.parser')
+    soup = BeautifulSoup(diary_page[0], 'html.parser')
 
     remove_script(soup)
     remove_form_items(soup)

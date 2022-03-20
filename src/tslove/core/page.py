@@ -34,7 +34,7 @@ class Page:
         html = web.get_page(param)
 
         page = Page()
-        page.add_page(html)
+        page.append(html)
         return page
 
     def __init__(self):
@@ -42,10 +42,13 @@ class Page:
         self.__image_paths: Set[str] = set()
         self.__script_paths: Set[str] = set()
 
-    @property
-    def page_count(self) -> int:
+    def __len__(self):
         '''htmlのページ数'''
         return len(self._html)
+
+    def __getitem__(self, key):
+        '''htmlページの内容'''
+        return self._html[key]
 
     @property
     def image_paths(self) -> Set[str]:
@@ -57,21 +60,13 @@ class Page:
         '''scriptタグのsrcの内容の集合'''
         return self.__script_paths
 
-    def add_page(self, html: str):
+    def append(self, html: str):
         '''ページを追加します
 
         :param html_page: HTMLページ
         '''
         self._html.append(html)
         self._parse(BeautifulSoup(html, 'html.parser'))
-
-    def get_html_page(self, page_num: int) -> str:
-        '''htmlページの内容を取得します
-
-        :param page_num: ページ番号
-        :return: htmlページの内容
-        '''
-        return self._html[page_num]
 
     def _parse(self, soup: BeautifulSoup) -> None:
         '''ページをパースしてプロパティをセットします'''
