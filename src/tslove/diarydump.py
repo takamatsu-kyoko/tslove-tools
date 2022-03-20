@@ -145,12 +145,12 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
         with open(file_name, 'w', encoding='utf-8') as file:
             file.write(soup.prettify(formatter=None))
 
-    def _dump_diary(self, diary_id: str, file_name: str) -> DiaryPage:
+    def _dump_diary(self, diary_id: str, file_name: str) -> dict:
         '''日記をダンプします
 
         :param diary_id: diary_id
         :param filename: 出力先ファイル名
-        :return: DiaryDumpオブジェクト
+        :return: ページ情報
         :rises: WebAccessError 日記の取得に失敗した場合
         :rises: OSError ファイルの書き込みに失敗した場合
         '''
@@ -170,7 +170,14 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
         with open(file_name, 'w', encoding='utf-8') as file:
             file.write(soup.prettify(formatter=None))
 
-        return diary_page
+        page_info = {
+            'title': diary_page.title,
+            'date': diary_page.date,
+            'prev_diary_id': diary_page.prev_diary_id,
+            'diary_id': diary_id
+        }
+
+        return page_info
 
     @staticmethod
     def __remove_script(soup: BeautifulSoup) -> None:
@@ -320,13 +327,8 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
                 if os.path.exists(file_name):
                     if diary_id in self._page_info:
                         source = 'page_info'
-                        if diary_id == self._config.diary_id_to or self._page_info[diary_id]['prev_diary_id'] is None:
-                            break
-
-                        diary_id = self._page_info[diary_id]['prev_diary_id']
-
+                        page_info = self._page_info[diary_id]
                         dump_process[source] += 1
-                        continue  # TODO page_infoを生成して continueせずに processed.のprintfまで回す
                     else:
                         source = 'local'
                         diary_page = DiaryPage(re_pattern)  # type: ignore
@@ -338,6 +340,12 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
                             print('Processing diary id {} failed. (local) {}'.format(diary_id, err))
                             return 1
 
+                        page_info = {
+                            'title': diary_page.title,
+                            'date': diary_page.date,
+                            'prev_diary_id': diary_page.prev_diary_id,
+                            'diary_id': diary_id
+                        }
                         dump_process[source] += 1
                 else:
                     source = 'remote'
@@ -349,10 +357,12 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
                     retry_count = self._web.total_retries
 
                     try:
-                        diary_page = self._dump_diary(diary_id, file_name)
+                        page_info = self._dump_diary(diary_id, file_name)
                     except (WebAccessError, OSError) as err:
                         print('Processing diary id {} failed. {}'.format(diary_id, err))
                         return 1
+
+                    dump_process[source] += 1
 
                     if self._web.total_retries == retry_count:
                         without_retry += 1
@@ -366,22 +376,13 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
                         print('Interval changes to {} sec.'.format(DiaryDumpApp.INTERVAL_LONG))
                         interval = DiaryDumpApp.INTERVAL_LONG
 
-                    dump_process[source] += 1
+                print('diary id {} ({}:{}) processed. ({})'.format(diary_id,
+                                                                   page_info['date'].strftime('%Y-%m-%d'),
+                                                                   page_info['title'],
+                                                                   source))
 
-                page_info = {
-                    'title': diary_page.title,
-                    'date': diary_page.date,
-                    'prev_diary_id': diary_page.prev_diary_id,
-                    'diary_id': diary_id
-                }
-
-                self._page_info[diary_id] = page_info
-
-                # TODO remot local page_info の区別を明示する
-                print('diary id {} ({}:{}) processed.{}'.format(diary_id,
-                                                                page_info['date'].strftime('%Y-%m-%d'),
-                                                                page_info['title'],
-                                                                '' if source == 'remote' else ' (local)'))
+                if source != 'page_info':
+                    self._page_info[diary_id] = page_info
 
                 if diary_id == self._config.diary_id_to or page_info['prev_diary_id'] is None:
                     break
