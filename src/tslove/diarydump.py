@@ -51,6 +51,8 @@ class Config:
 class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
     '''diarydump のアプリケーションクラス'''
 
+    DIARY_ID_PATTERN = re.compile(r'\./\?m=pc&a=page_fh_diary&target_c_diary_id=(?P<id>[0-9]+)')
+
     def __init__(self) -> None:
         super().__init__()
         self._config = self._setup_config()
@@ -88,6 +90,157 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
             }
         )
         return config
+
+    @staticmethod
+    def _check_first_diary_id() -> str:
+        '''最初にダウンロードする日記を取得します
+
+        :return: diary_id or None
+        :raises: WebAccessError プロフィールページの取得に失敗した場合
+        :raises: ValueError diary_idの取得に失敗した場合
+        '''
+        try:
+            profile_page = BeautifulSoup(Page.fetch_from_web('page_h_prof')[0], 'html.parser')
+            diary_list = profile_page.find('ul', class_='articleList')
+            result = DiaryDumpApp.DIARY_ID_PATTERN.match(diary_list.a['href'])
+            if result:
+                return result.group('id')
+        except WebAccessError as err:
+            print('Can not get first diary id. {}'.format(err))
+            raise err
+
+        raise ValueError('Diary id not match.')
+
+    def _dump_diary(self, diary_id: str, file_name: str) -> DiaryPage:
+        '''日記をダンプします
+
+        :param diary_id: diary_id
+        :param filename: 出力先ファイル名
+        :return: DiaryDumpオブジェクト
+        :rises: WebAccessError 日記の取得に失敗した場合
+        :rises: OSError ファイルの書き込みに失敗した場合
+        '''
+        diary_page = DiaryPage.fetch_from_web(diary_id)
+        image_paths = diary_page.image_paths
+        self._fetch_images(image_paths)
+
+        script_paths = diary_page.script_paths
+        self._fetch_scripts(script_paths)
+
+        soup = BeautifulSoup(diary_page[0], 'html.parser')
+
+        self.__remove_script(soup)
+        self.__remove_form_items(soup)
+        self.__fix_link(soup)
+
+        with open(file_name, 'w', encoding='utf-8') as file:
+            file.write(soup.prettify(formatter=None))
+
+        return diary_page
+
+    @staticmethod
+    def __remove_script(soup: BeautifulSoup) -> None:
+        '''ページからスクリプトを除去します
+
+        :param soup: ページ
+        '''
+        script_tags = soup.find_all('script')
+        for script_tag in script_tags:
+            if script_tag.has_attr('src'):
+                src = script_tag['src']
+                if src.startswith('./js/prototype.js') or src.startswith('./js/Selection.js') or src == './js/comment.js':
+                    script_tag.decompose()
+            else:
+                if 'url2cmd' not in script_tag.string:
+                    script_tag.decompose()
+
+        a_tags_with_script = soup.find_all('a', onclick=True)
+        for a_tag in a_tags_with_script:
+            a_tag.decompose()
+
+    @staticmethod
+    def __remove_form_items(soup):
+        '''ページからフォームアイテムを除去します'''
+        div_tag = soup.find('div', id='commentForm')
+        if div_tag:
+            div_tag.decompose()
+
+        div_tags = soup.find_all('div', class_='operation')
+        for div_tag in div_tags:
+            div_tag.decompose()
+
+        form_tag = soup.find('form')
+        if form_tag:
+            form_tag.unwrap()
+
+        input_tags = soup.find_all('input')
+        for input_tag in input_tags:
+            input_tag.decompose()
+
+    def __fix_link(self, soup: BeautifulSoup) -> None:
+        '''ページのリンクを修正します
+
+        :param soup: ページ
+        '''
+        link_tag = soup.find('link', rel='stylesheet')
+        if link_tag:
+            link_tag['href'] = './stylesheet/tslove.css'
+
+        a_tags_to_diary_list = soup.find_all('a', href=re.compile(r'^(\./)?\?m=pc&a=page_fh_diary_list.*'))
+        for a_tag_to_diary_list in a_tags_to_diary_list:
+            a_tag_to_diary_list['href'] = './index.html'
+            del a_tag_to_diary_list['rel']
+            del a_tag_to_diary_list['target']
+
+        a_tags_to_dialy = soup.find_all('a', href=re.compile(r'^(\./)?\?m=pc&a=page_fh_diary.*'))
+        for a_tag_to_dialy in a_tags_to_dialy:
+            result = DiaryDumpApp.DIARY_ID_PATTERN.match(a_tag_to_dialy['href'])
+            if result:
+                diary_id = result.group('id')
+                a_tag_to_dialy['href'] = './{}.html'.format(diary_id)
+            else:
+                a_tag_to_dialy['href'] = '#'
+            del a_tag_to_dialy['rel']
+            del a_tag_to_dialy['target']
+
+        a_tags_to_top = soup.find_all('a', href='./')
+        for a_tag_to_top in a_tags_to_top:
+            a_tag_to_top['href'] = './index.html'
+            del a_tag_to_top['rel']
+            del a_tag_to_top['target']
+
+        a_tags_to_action = soup.find_all('a', href=re.compile(r'^(\./)?\?m=pc&a=.+'))
+        for a_tag_to_action in a_tags_to_action:
+            a_tag_to_action['href'] = '#'
+            del a_tag_to_action['rel']
+            del a_tag_to_action['target']
+
+        a_tags_to_img = soup.find_all('a', href=re.compile(r'^(\./)?img.php.+'))
+        for a_tag_to_img in a_tags_to_img:
+            a_tag_to_img['href'] = './images/' + self._convert_image_path_to_filename(a_tag_to_img['href'])
+
+        img_tags = soup.find_all('img')
+        for img_tag in img_tags:
+            path = os.path.join('./images/', self._convert_image_path_to_filename(img_tag['src']))
+            if 'w=120&h=120' in img_tag['src']:
+                target_file = os.path.join(self._config.output_path['base'], path)
+
+                if os.path.exists(target_file):
+                    image = Image.open(target_file)
+                    if image.size[0] == image.size[1]:
+                        img_tag['width'] = 120
+                        img_tag['height'] = 120
+                    elif image.size[0] > image.size[1]:
+                        img_tag['width'] = 120
+                    else:
+                        img_tag['height'] = 120
+                else:
+                    img_tag['width'] = 120
+                    img_tag['height'] = 120
+            img_tag['src'] = path
+
+        for script_tag in soup.find_all('script', src=True):
+            script_tag['src'] = 'scripts/' + os.path.basename(script_tag['src'])
 
 
 def main():
