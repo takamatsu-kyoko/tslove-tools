@@ -77,10 +77,13 @@ def main():
         try:  # KeyBoardinterrupt
 
             file_name = os.path.join(config.output_path['base'], '{}.html'.format(diary_id))
+            re_pattern = {
+                'next_diary_id': re.compile(r'\./(?P<id>[0-9]+).html')
+            }
             if os.path.exists(file_name):
                 if diary_id not in page_info:
                     source = 'local'
-                    diary_page = DiaryPage()
+                    diary_page = DiaryPage(re_pattern)
                     try:
                         with open(file_name, 'r', encoding='utf-8') as file:
                             diary_page.append(file.read())
