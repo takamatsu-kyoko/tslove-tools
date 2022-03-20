@@ -111,6 +111,47 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
 
         raise ValueError('Diary id not match.')
 
+    def _output_index(self) -> None:
+        '''インデックスファイルを出力します
+
+        :rises: OSError ファイルの書き込みに失敗した場合
+        '''
+        template = '''
+        <!DOCTYPE html>
+        <html>
+        <head>
+        <title>Index of dialy</title>
+        <meta charset="utf-8"/>
+        </head>
+        <body>
+        <h1>Index of dialy</h1>
+        <table>
+        <tr><th>Date</th><th>Title</th></tr>
+        </table>
+        </body>
+        </html>
+        '''
+
+        soup = BeautifulSoup(template, 'html.parser')
+        table_tag = soup.table
+
+        for diary_id in sorted(self._page_info.keys(), key=int, reverse=True):
+            tr_tag = soup.new_tag('tr')
+            date_td_tag = soup.new_tag('td')
+            date_td_tag.string = self._page_info[diary_id]['date'].strftime('%Y年%m月%d日%H:%M')
+            tr_tag.append(date_td_tag)
+            title_td_tag = soup.new_tag('td')
+            title_a_tag = soup.new_tag('a')
+            title_a_tag['href'] = './{}.html'.format(self._page_info[diary_id]['diary_id'])
+            title_a_tag.string = self._page_info[diary_id]['title']
+            title_td_tag.append(title_a_tag)
+            tr_tag.append(title_td_tag)
+            table_tag.append(tr_tag)
+
+        file_name = os.path.join(self._config.output_path['base'], 'index.html')
+        with open(file_name, 'w', encoding='utf-8') as file:
+            file.write(soup.prettify(formatter=None))
+
     def _dump_diary(self, diary_id: str, file_name: str) -> DiaryPage:
         '''日記をダンプします
 
