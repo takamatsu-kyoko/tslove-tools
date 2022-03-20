@@ -216,3 +216,35 @@ class DumpApp():  # pylint: disable=R0903
                     new_path = './' + self.__convert_stylesheet_image_path_to_filename(old_path)
                     line = line.replace(old_path, new_path)
                 file.write(line + '\n')
+
+    def _fetch_scripts(self, script_paths: set, overwrite=False) -> None:
+        '''スクリプトを取得します
+
+        self._config の output_path 属性を利用します
+
+        スクリプトの取得の失敗はメッセージの出力のみで処理を継続します。例外の送出はありません
+
+        :params script_paths: 取得するスクリプトのパスの集合
+        :param overwrite: スクリプトを上書きする場合 True
+        '''
+        assert hasattr(self._config, 'output_path')
+
+        output_path = self._config.output_path['script']
+
+        for path in script_paths:
+
+            if path.startswith('./js/prototype.js') or path.startswith('./js/Selection.js') or path == './js/comment.js':
+                continue
+
+            filename = os.path.join(output_path, os.path.basename(path))
+            if os.path.exists(filename) and overwrite is False:
+                continue
+
+            try:
+                script = self._web.get_javascript(path)
+                with open(filename, 'w', encoding='utf-8') as file:
+                    file.write(script)
+
+            except (WebAccessError, OSError) as err:
+                print('Can not get script {}. {}'.format(path, err))
+                continue
