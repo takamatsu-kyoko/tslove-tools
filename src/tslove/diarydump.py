@@ -18,6 +18,7 @@ from tslove.core.web import TsLoveWeb
 from tslove.core.page import Page
 from tslove.core.diary import DiaryPage
 from tslove.core.exception import WebAccessError
+from tslove.dumpapp import DumpApp
 
 DIARY_ID_PATTERN = re.compile(r'\./\?m=pc&a=page_fh_diary&target_c_diary_id=(?P<id>[0-9]+)')
 URL_PATTERN = re.compile(r'url\((?P<path>.+)\)')
@@ -45,6 +46,48 @@ class Config:
     echo_password: bool
     show_session_id: bool
     php_session_id: Optional[str] = None
+
+
+class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
+    '''diarydump のアプリケーションクラス'''
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._config = self._setup_config()
+
+    @staticmethod
+    def _setup_config() -> Config:
+        '''コンフィグを生成します
+
+        :return: Configオブジェクト
+        '''
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-f', '--from', help='diary_id to start', metavar='<id>', type=int, default=None)
+        parser.add_argument('-t', '--to', help='diary_id to end', metavar='<id>', type=int, default=None)
+        parser.add_argument('-o', '--output', help='destination to dump. (default ./dump)', metavar='<PATH>', default='./dump')
+        parser.add_argument('--echo-password', help='display password on screen(DANGER)', action='store_true')
+        parser.add_argument('--show-session-id', help='for debug', action='store_true')
+        args = parser.parse_args()
+
+        diary_id_from, diary_id_to = vars(args)['from'], args.to  # from is keyword
+        if diary_id_from and diary_id_to and diary_id_from < diary_id_to:
+            diary_id_from, diary_id_to = diary_id_to, diary_id_from
+
+        base = os.path.join(args.output)
+        config = Config(
+            echo_password=args.echo_password,
+            show_session_id=args.show_session_id,
+            diary_id_from=str(diary_id_from) if diary_id_from else None,
+            diary_id_to=str(diary_id_to) if diary_id_to else None,
+            output_path={
+                'base': base,
+                'stylesheet': os.path.join(base, 'stylesheet'),
+                'image': os.path.join(base, 'images'),
+                'script': os.path.join(base, 'scripts'),
+                'tools': os.path.join(base, 'tslove-tools')
+            }
+        )
+        return config
 
 
 def main():
