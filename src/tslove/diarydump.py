@@ -294,10 +294,6 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
             print('Login failed.')
             return 1
 
-        # TODO self._login() に含める
-        if self._config.show_session_id:
-            print('PHP_SESSION_ID: {}'.format(self._web.php_session_id))
-
         # TODO ログインの成功とこの後の進捗を画面に表示する
         try:
             self._prepare_directories()

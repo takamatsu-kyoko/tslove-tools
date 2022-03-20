@@ -23,10 +23,11 @@ class DumpApp():  # pylint: disable=R0903
     def _login(self) -> bool:
         '''ログイン処理を行います
 
-        self._config の php_session_id と echo_password 属性を利用します
+        self._config の show_session_id, php_session_id, echo_password 属性を利用します
 
         :return: ログインに成功した場合 True
         '''
+        assert hasattr(self._config, 'show_session_id')
         assert hasattr(self._config, 'php_session_id')
         assert hasattr(self._config, 'echo_password')
 
@@ -41,10 +42,16 @@ class DumpApp():  # pylint: disable=R0903
                 password = getpass.getpass(prompt='pass: ')
             else:
                 password = input('pass: ')
-            return self._web.login(username, password)
+
+            if self._web.login(username, password):
+                if self._config.show_session_id:
+                    print('PHP_SESSION_ID: {}'.format(self._web.php_session_id))
+                return True
+
         except WebAccessError as err:
             print(err)
-            return False
+
+        return False
 
     def _prepare_directories(self) -> None:
         '''出力先のディレクトリを用意します
