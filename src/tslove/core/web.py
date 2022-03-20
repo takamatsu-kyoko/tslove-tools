@@ -155,7 +155,7 @@ class TsLoveWeb:
 
         return self.__request(request, message)
 
-    def login(self, username: str, password: str, php_session_id: str = None) -> bool:
+    def login(self, username: Optional[str], password: Optional[str], php_session_id: Optional[str] = None) -> bool:
         '''T'sLoveへのログインをおこないます
 
         sns_session_idを取得できることによってログインの成功を判定します
@@ -170,7 +170,10 @@ class TsLoveWeb:
         :raises RetryCountExceededError: リトライ回数が基準を超過した場合
         '''
         if php_session_id is None:
-            self.__php_session_id = self.__get_php_session_id(username, password)
+            if username and password:
+                self.__php_session_id = self.__get_php_session_id(username, password)
+            else:
+                return False
         else:
             self.__php_session_id = php_session_id
             self.__session.cookies.set('PHPSESSID', php_session_id)
