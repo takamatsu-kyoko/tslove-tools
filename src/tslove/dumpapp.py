@@ -1,6 +1,8 @@
 '''ダンプアプリケーションの基本的な機能を提供します'''
 
+import datetime
 import getpass
+import json
 import os
 import re
 from typing import Any
@@ -248,3 +250,47 @@ class DumpApp():  # pylint: disable=R0903
             except (WebAccessError, OSError) as err:
                 print('Can not get script {}. {}'.format(path, err))
                 continue
+
+    def _load_page_info(self) -> None:
+        '''ページ情報ファイルを読み込みます
+
+        self._config の output_path 属性を利用します
+
+        :raises: OSError ファイルの読み込みに失敗した場合
+        '''
+        assert hasattr(self._config, 'output_path')
+
+        def convert_datetime(dct):
+            if 'date' in dct:
+                dct['date'] = datetime.datetime.strptime(dct['date'], '%Y-%m-%d %H:%M:%S')
+            return dct
+
+        page_info_path = os.path.join(self._config.output_path['tools'], 'page_info.json')
+        if os.path.exists(page_info_path):
+            try:
+                with open(page_info_path, 'r', encoding='utf-8') as file:
+                    self._page_info = json.load(file, object_hook=convert_datetime)
+
+            except OSError as err:
+                print('Can not load page info {}. {}'.format(page_info_path, err))
+                raise err
+        else:
+            self._page_info = {}
+
+    def _save_page_info(self) -> None:
+        '''ページ情報ファイルを保存します
+
+        self._config の output_path 属性を利用します
+
+        :raises: OSError ファイルの書き込みに失敗した場合
+        '''
+        assert hasattr(self._config, 'output_path')
+
+        page_info_path = os.path.join(self._config.output_path['tools'], 'page_info.json')
+
+        try:
+            with open(page_info_path, 'w', encoding='utf-8') as file:
+                json.dump(self._page_info, file, ensure_ascii=False, indent=2, default=str)
+        except OSError as err:
+            print('Can not save page info {}. {}'.format(page_info_path, err))
+            raise err
