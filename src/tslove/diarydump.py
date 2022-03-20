@@ -51,6 +51,10 @@ class Config:
 class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
     '''diarydump のアプリケーションクラス'''
 
+    INTERVAL_SHORT = 10
+    INTERVAL_LONG = 20
+    INTERVAL_CHANGE_TIMING = 5
+
     DIARY_ID_PATTERN = re.compile(r'\./\?m=pc&a=page_fh_diary&target_c_diary_id=(?P<id>[0-9]+)')
 
     def __init__(self) -> None:
@@ -282,6 +286,139 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
 
         for script_tag in soup.find_all('script', src=True):
             script_tag['src'] = 'scripts/' + os.path.basename(script_tag['src'])
+
+    def run(self) -> int:
+        '''アプリケーション処理本体
+
+        :return: 正常終了時 0
+        '''
+        # TODO 起動メッセージ(バージョン)を画面に表示する
+
+        if not self._login():
+            print('Login failed.')
+            return 1
+
+        # TODO self._login() に含める
+        if self._config.show_session_id:
+            print('PHP_SESSION_ID: {}'.format(self._web.php_session_id))
+
+        # TODO ログインの成功とこの後の進捗を画面に表示する
+        try:
+            self._prepare_directories()
+            self._dump_stylesheet()
+            self._load_page_info()
+            if self._config.diary_id_from:
+                diary_id = self._config.diary_id_from
+            else:
+                diary_id = self._check_first_diary_id()
+        except (WebAccessError, OSError, ValueError):
+            return 1
+
+        interval = 0  # 初回のダンプではインターバルを取らない
+        without_retry = 0
+        dump_process = {
+            'page_info': 0,
+            'local': 0,
+            'remote': 0
+        }
+        re_pattern = {
+            'next_diary_id': re.compile(r'\./(?P<id>[0-9]+).html')
+        }
+
+        while diary_id:
+            try:  # KeyBoardinterrupt
+                file_name = os.path.join(self._config.output_path['base'], '{}.html'.format(diary_id))
+                if os.path.exists(file_name):
+                    if diary_id in self._page_info:
+                        source = 'page_info'
+                        if diary_id == self._config.diary_id_to or self._page_info[diary_id]['prev_diary_id'] is None:
+                            break
+
+                        diary_id = self._page_info[diary_id]['prev_diary_id']
+
+                        dump_process[source] += 1
+                        continue  # TODO page_infoを生成して continueせずに processed.のprintfまで回す
+                    else:
+                        source = 'local'
+                        diary_page = DiaryPage(re_pattern)  # type: ignore
+
+                        try:
+                            with open(file_name, 'r', encoding='utf-8') as file:
+                                diary_page.append(file.read())
+                        except OSError as err:
+                            print('Processing diary id {} failed. (local) {}'.format(diary_id, err))
+                            return 1
+
+                        dump_process[source] += 1
+                else:
+                    source = 'remote'
+
+                    time.sleep(interval)
+                    if interval < DiaryDumpApp.INTERVAL_SHORT:
+                        interval = DiaryDumpApp.INTERVAL_LONG
+
+                    retry_count = self._web.total_retries
+
+                    try:
+                        diary_page = self._dump_diary(diary_id, file_name)
+                    except (WebAccessError, OSError) as err:
+                        print('Processing diary id {} failed. {}'.format(diary_id, err))
+                        return 1
+
+                    if self._web.total_retries == retry_count:
+                        without_retry += 1
+                    else:
+                        without_retry = 0
+
+                    if interval != DiaryDumpApp.INTERVAL_SHORT and without_retry > DiaryDumpApp.INTERVAL_CHANGE_TIMING:
+                        print('Interval changes to {} sec.'.format(DiaryDumpApp.INTERVAL_SHORT))
+                        interval = DiaryDumpApp.INTERVAL_SHORT
+                    if interval != DiaryDumpApp.INTERVAL_LONG and without_retry <= DiaryDumpApp.INTERVAL_CHANGE_TIMING:
+                        print('Interval changes to {} sec.'.format(DiaryDumpApp.INTERVAL_LONG))
+                        interval = DiaryDumpApp.INTERVAL_LONG
+
+                    dump_process[source] += 1
+
+                page_info = {
+                    'title': diary_page.title,
+                    'date': diary_page.date,
+                    'prev_diary_id': diary_page.prev_diary_id,
+                    'diary_id': diary_id
+                }
+
+                self._page_info[diary_id] = page_info
+
+                # TODO remot local page_info の区別を明示する
+                print('diary id {} ({}:{}) processed.{}'.format(diary_id,
+                                                                page_info['date'].strftime('%Y-%m-%d'),
+                                                                page_info['title'],
+                                                                '' if source == 'remote' else ' (local)'))
+
+                if diary_id == self._config.diary_id_to or page_info['prev_diary_id'] is None:
+                    break
+
+                diary_id = page_info['prev_diary_id']
+
+            except KeyboardInterrupt:
+                # TODO 中断したことを画面に表示する
+                break
+        try:
+            self._save_page_info()
+        except OSError:
+            pass
+
+        try:
+            self._output_index()
+        except OSError as err:
+            print('Can not save index file. {}'.format(err))
+            return 1
+
+        if dump_process['page_info']:
+            print('done. (skip {} diaries)'.format(dump_process['page_info']))
+        else:
+            print('done.')
+
+        return 0
 
 
 def main():
