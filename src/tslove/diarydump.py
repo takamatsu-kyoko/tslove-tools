@@ -311,21 +311,29 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
 
         :return: 正常終了時 0
         '''
-        # TODO 起動メッセージ(バージョン)を画面に表示する
+        print('dumpdiary copyright (c) 2018\n')
 
         if not self._login():
-            print('Login failed.')
+            print('\nLogin failed.')
             return 1
 
-        # TODO ログインの成功とこの後の進捗を画面に表示する
+        print('\nLogin success.')
         try:
+            print('Prepare directories', end='.....')
             self._prepare_directories()
+            print('done.')
+            print('Dump stylesheet', end='.....')
             self._dump_stylesheet()
+            print('done.')
+            print('Load page_info file', end='.....')
             self._load_page_info()
+            print('done.')
+            print('Check first diary id ', end='.....')
             if self._config.diary_id_from:
                 diary_id = self._config.diary_id_from
             else:
                 diary_id = self._check_first_diary_id()
+            print('{}\n'.format(diary_id))
         except (WebAccessError, OSError, ValueError):
             return 1
 
@@ -409,7 +417,7 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
                 diary_id = page_info['prev_diary_id']
 
             except KeyboardInterrupt:
-                # TODO 中断したことを画面に表示する
+                print('abort loop.')
                 break
         try:
             self._save_page_info()
@@ -422,10 +430,7 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
             print('Can not save index file. {}'.format(err))
             return 1
 
-        if dump_process['page_info']:
-            print('done. (skip {} diaries)'.format(dump_process['page_info']))
-        else:
-            print('done.')
+        print('done. Total {} diaries.'.format(sum(dump_process.values())))
 
         return 0
 
