@@ -6,7 +6,7 @@ import re
 import sys
 import time
 from dataclasses import dataclass
-from typing import Optional, TypedDict
+from typing import Optional, TypedDict, Set, List, Tuple
 
 from bs4 import BeautifulSoup  # type: ignore
 from PIL import Image  # type: ignore
@@ -155,8 +155,13 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
         :rises: OSError ファイルの書き込みに失敗した場合
         '''
         diary_page = DiaryPage.fetch_from_web(diary_id)
-        image_paths = diary_page.image_paths
-        self._fetch_images(image_paths)
+
+        for src, dst in self.__create_diary_image_path_list(diary_page.image_paths):
+            try:
+                self._dump_image(src, dst)
+            except (WebAccessError, OSError, ValueError) as err:
+                print('Can not dump image {} -> {}. {}'.format(src, dst, err))
+                continue
 
         script_paths = diary_page.script_paths
         self._fetch_scripts(script_paths)
@@ -178,6 +183,24 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
         }
 
         return page_info
+
+    def __create_diary_image_path_list(self, src_paths: Set[str]) -> List[Tuple[str, str]]:
+        '''画像の取得元・保存先のリストを作成します
+
+        :params src_paths: 画像の取得元の集合
+        :return: 画像の取得元・保存先のタプルのリスト
+        '''
+        output_path = self._config.output_path['image']
+
+        path_list = []
+        for src_path in src_paths:
+            if '://' in src_path:
+                continue
+
+            dst_path = os.path.join(output_path, self._find_filename_from_src_path(src_path))
+            path_list.append((src_path, dst_path))
+
+        return path_list
 
     @staticmethod
     def __remove_script(soup: BeautifulSoup) -> None:
@@ -258,11 +281,11 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
 
         a_tags_to_img = soup.find_all('a', href=re.compile(r'^(\./)?img.php.+'))
         for a_tag_to_img in a_tags_to_img:
-            a_tag_to_img['href'] = './images/' + self._convert_image_path_to_filename(a_tag_to_img['href'])
+            a_tag_to_img['href'] = './images/' + self._find_filename_from_src_path(a_tag_to_img['href'])
 
         img_tags = soup.find_all('img')
         for img_tag in img_tags:
-            path = os.path.join('./images/', self._convert_image_path_to_filename(img_tag['src']))
+            path = os.path.join('./images/', self._find_filename_from_src_path(img_tag['src']))
             if 'w=120&h=120' in img_tag['src']:
                 target_file = os.path.join(self._config.output_path['base'], path)
 

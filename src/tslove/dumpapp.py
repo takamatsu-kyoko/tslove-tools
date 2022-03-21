@@ -5,7 +5,7 @@ import getpass
 import json
 import os
 import re
-from typing import Any
+from typing import Any, List, Tuple
 
 from tslove.core.web import TsLoveWeb
 from tslove.core.exception import WebAccessError
@@ -71,59 +71,60 @@ class DumpApp():  # pylint: disable=R0903
             print('Can not create directory. {}'.format(err))
             raise err
 
-    # TODO 画像の取得は取得元,保存先の対のリストを入力として共通化する
-    def _fetch_images(self, image_paths: set, overwrite=False):
+    def _dump_image(self, src_path: str, dst_path: str, overwrite=False) -> None:
         '''画像を取得します
 
-        self._config の output_path 属性を利用します
+        img.phpを利用する場合オリジナルの画像サイズで取得するためにパラメータを組み立て直しています
 
-        画像の取得の失敗はメッセージの出力のみで処理を継続します。例外の送出はありません
-
-        :param image_paths: 取得する画像のパスの集合
+        :param src_path: 取得元のパス
+        :param dst_path: 保存先のパス
         :param overwrite: 画像を上書きする場合 True
-        '''
-        assert hasattr(self._config, 'output_path')
-
-        output_path = self._config.output_path['image']
-
-        for path in image_paths:
-            if '://' in path:
-                continue
-
-            filename = os.path.join(output_path, self._convert_image_path_to_filename(path))
-            if os.path.exists(filename) and overwrite is False:
-                continue
-
-            try:
-                if 'img.php' in path:
-                    params = {'m': 'pc',
-                              'filename': self._convert_image_path_to_filename(path),
-                              }
-                    image = self._web.get_image('img.php', params)
-                else:
-                    image = self._web.get_image(path)
-                image.save(filename)
-            except (WebAccessError, OSError) as err:
-                print('Can not get image {}. {}'.format(path, err))
-                continue
-
-    # TODO 画像の取得は取得元,保存先の対のリストを入力として共通化する
-    # DiaryDumpApp.fix_linkが使う
-    @staticmethod
-    def _convert_image_path_to_filename(path: str) -> str:
-        '''画像のパスをファイル名に変換します
-
-        :param path: 変換前のpath
-        :return: 変換後のpath
+        :raise: WebAccessError 画像の取得に失敗した場合
+        :raise: OSError 画像の保存に失敗した場合
+        :raise: ValueError 取得元のパスからファイル名を取得出来なかった場合
         '''
         pattern = re.compile(r'filename=(?P<filename>[^&;?]+)')
-        result = pattern.search(path)
-        if result:
-            filename = result.group('filename')
-        else:
-            filename = os.path.basename(path)
 
-        return filename
+        if os.path.exists(dst_path) and overwrite is False:
+            return
+
+        if 'img.php' in src_path:
+            result = pattern.search(src_path)
+            if result:
+                params = {'m': 'pc',
+                          'filename': result.group('filename')
+                          }
+                image = self._web.get_image('img.php', params)
+            else:
+                raise ValueError('Src filename not match')
+        else:
+            image = self._web.get_image(src_path)
+
+        image.save(dst_path)
+
+    @staticmethod
+    def _find_filename_from_src_path(path: str) -> str:
+        '''imgタグやスタイルシート内のパスからファイル名を見つけます
+
+        pathにimg_skin.phpが含まれる場合はクエリパラメータからimage_filenameの値を
+        pathにimg.phpが含まれる場合はクエリパラメータからfilenameの値を抜き出します
+        それ以外あるいは該当のクエリパラメータが存在しない場合はbasenameを返します
+
+        :param path: パス
+        :return: ファイル名
+        '''
+        img_pattern = re.compile(r'./img\.php.+filename=(?P<filename>[^&;?]+)')
+        img_skin_pattern = re.compile(r'./img_skin\.php.+image_filename=(?P<filename>[^&;?]+)')
+
+        result = img_pattern.search(path)
+        if result:
+            return result.group('filename')
+
+        result = img_skin_pattern.search(path)
+        if result:
+            return result.group('filename')
+
+        return os.path.basename(path)
 
     def _dump_stylesheet(self) -> None:
         '''スタイルシートをダンプします
@@ -135,96 +136,55 @@ class DumpApp():  # pylint: disable=R0903
         '''
         assert hasattr(self._config, 'output_path')
 
-        stylesheet_file_name = os.path.join(self._config.output_path['stylesheet'], 'tslove.css')
-        if not os.path.exists(stylesheet_file_name):
-            try:
-                stylesheet = self._web.get_stylesheet()
-                image_paths = self.__collect_stylesheet_image_paths(stylesheet)
-                self.__fetch_stylesheet_images(image_paths)
-                self.__output_stylesheet(stylesheet, stylesheet_file_name)
-            except (WebAccessError, OSError) as err:
-                print('Can not get stylesheet. {}'.format(err))
-                raise err
+        file_name = os.path.join(self._config.output_path['stylesheet'], 'tslove.css')
+        if os.path.exists(file_name):
+            return
 
-    # TODO この機能はStylesheetクラスを作成してそちらに移す
-    @staticmethod
-    def __collect_stylesheet_image_paths(stylesheet: str) -> set:
-        '''スタイルシートに含まれる画像ファイルのパスを収集します
+        try:
+            stylesheet = self._web.get_stylesheet()
+            for src, dst in self.__create_stylesheet_image_path_list(stylesheet):
+                try:
+                    self._dump_image(src, dst)
+                except (WebAccessError, OSError, ValueError) as err:
+                    print('Can not dump image {} -> {}. {}'.format(src, dst, err))
+                    continue
 
-        :param stylesheet: スタイルシートの内容
-        :return: 画像ファイルのパスの集合
-        '''
-        paths = set()
-        for line in stylesheet.splitlines():
-            result = DumpApp.STYLESHEET_URL_PATTERN.search(line)
-            if result:
-                paths.add(result.group('path'))
+            with open(file_name, 'w', encoding='utf-8') as file:
+                for line in stylesheet.splitlines():
+                    result = DumpApp.STYLESHEET_URL_PATTERN.search(line)
+                    if result:
+                        old_path = result.group('path')
+                        new_path = './' + self._find_filename_from_src_path(old_path)
+                        line = line.replace(old_path, new_path)
+                    file.write(line + '\n')
 
-        return paths
+        except (WebAccessError, OSError) as err:
+            print('Can not get stylesheet. {}'.format(err))
+            raise err
 
-    # TODO 画像の取得は取得元,保存先の対のリストを入力として共通化する
-    def __fetch_stylesheet_images(self, image_paths: set, overwrite=False) -> None:
-        '''スタイルシートに含まれる画像を取得します
+    def __create_stylesheet_image_path_list(self, stylesheet: str) -> List[Tuple[str, str]]:
+        '''スタイルシート中の画像の取得元・保存先のリストを作成します
 
         self._config の output_path 属性を利用します
 
-        画像の取得の失敗はメッセージの出力のみで処理を継続します。例外の送出はありません
-
-        :param image_paths: 取得する画像のパスの集合
-        :param overwrite: 画像を上書きする場合 True
+        :param stylesheet: スタイルシートの内容
+        :return: 画像の取得元・保存先のタプルのリスト
         '''
         assert hasattr(self._config, 'output_path')
 
         output_path = self._config.output_path['stylesheet']
         exclude_path = ['./skin/default/img/marker.gif']
 
-        for path in image_paths:
-            if path in exclude_path:
-                continue
+        path_list = []
+        for line in stylesheet.splitlines():
+            result = DumpApp.STYLESHEET_URL_PATTERN.search(line)
+            if result:
+                src_path = result.group('path')
+                if src_path not in exclude_path:
+                    dst_path = os.path.join(output_path, self._find_filename_from_src_path(src_path))
+                    path_list.append((src_path, dst_path))
 
-            filename = os.path.join(output_path, self.__convert_stylesheet_image_path_to_filename(path))
-            if os.path.exists(filename) and overwrite is False:
-                continue
-
-            try:
-                image = self._web.get_image(path)
-                image.save(filename)
-            except (WebAccessError, OSError) as err:
-                print('Can not get stylesheets image {}. {}'.format(path, err))
-                continue
-
-    # TODO 画像の取得は取得元,保存先の対のリストを入力として共通化する
-    @staticmethod
-    def __convert_stylesheet_image_path_to_filename(path: str) -> str:
-        '''スタイルシートに含まれる画像のパスをファイル名に変換します
-
-        :param path: 変換前のpath
-        :return: 変換後のpath
-        '''
-        pattern = re.compile(r'image_filename=(?P<filename>[^&;?]+)')
-        result = pattern.search(path)
-        if result:
-            filename = result.group('filename')
-        else:
-            filename = os.path.basename(path)
-
-        return filename
-
-    def __output_stylesheet(self, stylesheet: str, file_name: str) -> None:
-        '''スタイルシートをファイルに出力します
-
-        :param stylesheet: スタイルシート本文
-        :param file_name: 出力先
-        :raises: OSError ファイルの書き込みに失敗した場合
-        '''
-        with open(file_name, 'w', encoding='utf-8') as file:
-            for line in stylesheet.splitlines():
-                result = DumpApp.STYLESHEET_URL_PATTERN.search(line)
-                if result:
-                    old_path = result.group('path')
-                    new_path = './' + self.__convert_stylesheet_image_path_to_filename(old_path)
-                    line = line.replace(old_path, new_path)
-                file.write(line + '\n')
+        return path_list
 
     def _fetch_scripts(self, script_paths: set, overwrite=False) -> None:
         '''スクリプトを取得します
