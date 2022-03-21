@@ -143,7 +143,7 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
 
         file_name = os.path.join(self._config.output_path['base'], 'index.html')
         with open(file_name, 'w', encoding='utf-8') as file:
-            file.write(soup.prettify(formatter=None))
+            file.write(soup.prettify(formatter='html'))
 
     def _dump_diary(self, diary_id: str, file_name: str) -> dict:
         '''日記をダンプします
@@ -173,7 +173,7 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
         self.__fix_link(soup)
 
         with open(file_name, 'w', encoding='utf-8') as file:
-            file.write(soup.prettify(formatter=None))
+            file.write(soup.prettify(formatter='html'))
 
         page_info = {
             'title': diary_page.title,
