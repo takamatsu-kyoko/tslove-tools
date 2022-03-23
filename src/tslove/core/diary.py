@@ -16,7 +16,7 @@ from tslove.core.exception import NoSuchDiaryError
 
 class DiaryRegexPatterns(TypedDict):
     '''DiaryPageの正規表現'''
-    next_diary_id: re.Pattern
+    prev_diary_id: re.Pattern
 
 
 class DiaryPage(Page):
@@ -52,7 +52,7 @@ class DiaryPage(Page):
         self.__date: Optional[datetime] = None
         self.__prev_diary_id: Optional[str] = None
         self.__re_pattern: DiaryRegexPatterns = {
-            'next_diary_id': re.compile(r'target_c_diary_id=(?P<id>[0-9]+)')
+            'prev_diary_id': re.compile(r'target_c_diary_id=(?P<id>[0-9]+)')
         }
 
         if re_pattern:
@@ -87,7 +87,7 @@ class DiaryPage(Page):
         if not self.__prev_diary_id:
             prev_paragraph = soup.find('p', class_='prev')
             if prev_paragraph:
-                pattern = self.__re_pattern['next_diary_id']
+                pattern = self.__re_pattern['prev_diary_id']
                 result = pattern.search(prev_paragraph.a['href'])
                 if result:
                     self.__prev_diary_id = result.group('id')

@@ -345,7 +345,7 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
             'remote': 0
         }
         re_pattern = {
-            'next_diary_id': re.compile(r'\./(?P<id>[0-9]+).html')
+            'prev_diary_id': re.compile(r'\./(?P<id>[0-9]+).html')
         }
 
         while diary_id:
