@@ -78,7 +78,12 @@ class DiaryPage(Page):
         super()._parse(soup)
 
         if not self.__title:
-            self.__title = str(soup.find('p', class_='heading').get_text(strip=True))
+            title_p_tag = soup.find('p', class_='heading')
+            for img_tag in title_p_tag.find_all('img'):
+                alt_string = img_tag['alt']
+                img_tag.replace_with('({})'.format(alt_string))
+
+            self.__title = str(title_p_tag.get_text(strip=True))
 
         if not self.__date:
             date_str = str(soup.find('div', class_='dparts diaryDetailBox').div.dl.dt.get_text(strip=True))
