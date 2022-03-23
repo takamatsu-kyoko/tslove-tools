@@ -319,16 +319,16 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
 
         print('\nLogin success.')
         try:
-            print('Prepare directories', end='.....')
+            print('Prepare directories', end='.....', flush=True)
             self._prepare_directories()
             print('done.')
-            print('Dump stylesheet', end='.....')
+            print('Dump stylesheet', end='.....', flush=True)
             self._dump_stylesheet()
             print('done.')
-            print('Load page_info file', end='.....')
+            print('Load page_info file', end='.....', flush=True)
             self._load_page_info()
             print('done.')
-            print('Check first diary id ', end='.....')
+            print('Check first diary id ', end='.....', flush=True)
             if self._config.diary_id_from:
                 diary_id = self._config.diary_id_from
             else:
