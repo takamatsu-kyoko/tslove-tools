@@ -85,9 +85,11 @@ class DiaryPage(Page):
             self.__date = datetime.strptime(date_str, '%Y年%m月%d日%H:%M')
 
         if not self.__prev_diary_id:
-            prev_paragraph = soup.find('p', class_='prev')
-            if prev_paragraph:
-                pattern = self.__re_pattern['prev_diary_id']
-                result = pattern.search(prev_paragraph.a['href'])
-                if result:
-                    self.__prev_diary_id = result.group('id')
+            prev_next_div_tag = soup.find('div', class_='prevNextLinkLine')
+            if prev_next_div_tag:
+                prev_p_tag = prev_next_div_tag.find('p', class_='prev')
+                if prev_p_tag:
+                    pattern = self.__re_pattern['prev_diary_id']
+                    result = pattern.search(prev_p_tag.a['href'])
+                    if result:
+                        self.__prev_diary_id = result.group('id')
