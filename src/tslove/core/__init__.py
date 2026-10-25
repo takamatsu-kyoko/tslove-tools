@@ -1,1 +1,1 @@
-'''tslove-tools core パッケージ'''
+"""tslove-tools core パッケージ"""

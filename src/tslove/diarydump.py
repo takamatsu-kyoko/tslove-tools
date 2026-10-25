@@ -1,4 +1,4 @@
-'''T's LOVEの日記を一括してダウンロードするプログラム'''
+"""T's LOVEの日記を一括してダウンロードするプログラム"""
 
 import argparse
 import os
@@ -18,7 +18,8 @@ from tslove.dumpapp import DumpApp
 
 
 class OutputPath(TypedDict):
-    '''ダンプの出力先'''
+    """ダンプの出力先"""
+
     base: str
     stylesheet: str
     image: str
@@ -28,7 +29,8 @@ class OutputPath(TypedDict):
 
 @dataclass
 class Config:
-    '''コンフィグ'''
+    """コンフィグ"""
+
     diary_id_from: Optional[str]
     diary_id_to: Optional[str]
     output_path: OutputPath
@@ -38,7 +40,7 @@ class Config:
 
 
 class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
-    '''diarydump のアプリケーションクラス'''
+    """diarydump のアプリケーションクラス"""
 
     INTERVAL_SHORT = 10
     INTERVAL_LONG = 20
@@ -52,14 +54,16 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
 
     @staticmethod
     def _setup_config() -> Config:
-        '''コンフィグを生成します
+        """コンフィグを生成します
 
         :return: Configオブジェクト
-        '''
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument('-f', '--from', help='diary_id to start', metavar='<id>', type=int, default=None)
         parser.add_argument('-t', '--to', help='diary_id to end', metavar='<id>', type=int, default=None)
-        parser.add_argument('-o', '--output', help='destination to dump. (default ./dump)', metavar='<PATH>', default='./dump')
+        parser.add_argument(
+            '-o', '--output', help='destination to dump. (default ./dump)', metavar='<PATH>', default='./dump'
+        )
         parser.add_argument('--echo-password', help='display password on screen(DANGER)', action='store_true')
         parser.add_argument('--show-session-id', help='for debug', action='store_true')
         args = parser.parse_args()
@@ -79,19 +83,19 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
                 'stylesheet': os.path.join(base, 'stylesheet'),
                 'image': os.path.join(base, 'images'),
                 'script': os.path.join(base, 'scripts'),
-                'tools': os.path.join(base, 'tslove-tools')
-            }
+                'tools': os.path.join(base, 'tslove-tools'),
+            },
         )
         return config
 
     @staticmethod
     def _check_first_diary_id() -> str:
-        '''最初にダウンロードする日記を取得します
+        """最初にダウンロードする日記を取得します
 
         :return: diary_id or None
         :raises: WebAccessError プロフィールページの取得に失敗した場合
         :raises: ValueError diary_idの取得に失敗した場合
-        '''
+        """
         try:
             profile_page = BeautifulSoup(Page.fetch_from_web('page_h_prof')[0], 'html.parser')
             diary_list = profile_page.find('ul', class_='articleList')
@@ -105,11 +109,11 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
         raise ValueError('Diary id not match.')
 
     def _output_index(self) -> None:
-        '''インデックスファイルを出力します
+        """インデックスファイルを出力します
 
         :rises: OSError ファイルの書き込みに失敗した場合
-        '''
-        template = '''
+        """
+        template = """
         <!DOCTYPE html>
         <html>
         <head>
@@ -123,7 +127,7 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
         </table>
         </body>
         </html>
-        '''
+        """
 
         soup = BeautifulSoup(template, 'html.parser')
         table_tag = soup.table
@@ -146,14 +150,14 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
             file.write(soup.prettify(formatter='html'))
 
     def _dump_diary(self, diary_id: str, file_name: str) -> dict:
-        '''日記をダンプします
+        """日記をダンプします
 
         :param diary_id: diary_id
         :param filename: 出力先ファイル名
         :return: ページ情報
         :rises: WebAccessError 日記の取得に失敗した場合
         :rises: OSError ファイルの書き込みに失敗した場合
-        '''
+        """
         diary_page = DiaryPage.fetch_from_web(diary_id)
 
         for src, dst in self.__create_diary_image_path_list(diary_page.image_paths):
@@ -179,17 +183,17 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
             'title': diary_page.title,
             'date': diary_page.date,
             'prev_diary_id': diary_page.prev_diary_id,
-            'diary_id': diary_id
+            'diary_id': diary_id,
         }
 
         return page_info
 
     def __create_diary_image_path_list(self, src_paths: Set[str]) -> List[Tuple[str, str]]:
-        '''画像の取得元・保存先のリストを作成します
+        """画像の取得元・保存先のリストを作成します
 
         :params src_paths: 画像の取得元の集合
         :return: 画像の取得元・保存先のタプルのリスト
-        '''
+        """
         output_path = self._config.output_path['image']
 
         path_list = []
@@ -204,15 +208,19 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
 
     @staticmethod
     def __remove_script(soup: BeautifulSoup) -> None:
-        '''ページからスクリプトを除去します
+        """ページからスクリプトを除去します
 
         :param soup: ページ
-        '''
+        """
         script_tags = soup.find_all('script')
         for script_tag in script_tags:
             if script_tag.has_attr('src'):
                 src = script_tag['src']
-                if src.startswith('./js/prototype.js') or src.startswith('./js/Selection.js') or src == './js/comment.js':
+                if (
+                    src.startswith('./js/prototype.js')
+                    or src.startswith('./js/Selection.js')
+                    or src == './js/comment.js'
+                ):
                     script_tag.decompose()
             else:
                 if 'url2cmd' not in script_tag.string:
@@ -224,7 +232,7 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
 
     @staticmethod
     def __remove_form_items(soup):
-        '''ページからフォームアイテムを除去します'''
+        """ページからフォームアイテムを除去します"""
         div_tag = soup.find('div', id='commentForm')
         if div_tag:
             div_tag.decompose()
@@ -242,10 +250,10 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
             input_tag.decompose()
 
     def __fix_link(self, soup: BeautifulSoup) -> None:
-        '''ページのリンクを修正します
+        """ページのリンクを修正します
 
         :param soup: ページ
-        '''
+        """
         link_tag = soup.find('link', rel='stylesheet')
         if link_tag:
             link_tag['href'] = './stylesheet/tslove.css'
@@ -307,10 +315,10 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
             script_tag['src'] = 'scripts/' + os.path.basename(script_tag['src'])
 
     def run(self) -> int:
-        '''アプリケーション処理本体
+        """アプリケーション処理本体
 
         :return: 正常終了時 0
-        '''
+        """
         print('dumpdiary copyright (c) 2018\n')
 
         if not self._login():
@@ -339,14 +347,8 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
 
         interval = 0  # 初回のダンプではインターバルを取らない
         without_retry = 0
-        dump_process = {
-            'page_info': 0,
-            'local': 0,
-            'remote': 0
-        }
-        re_pattern = {
-            'prev_diary_id': re.compile(r'\./(?P<id>[0-9]+).html')
-        }
+        dump_process = {'page_info': 0, 'local': 0, 'remote': 0}
+        re_pattern = {'prev_diary_id': re.compile(r'\./(?P<id>[0-9]+).html')}
 
         while diary_id:
             try:  # KeyBoardinterrupt
@@ -371,7 +373,7 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
                             'title': diary_page.title,
                             'date': diary_page.date,
                             'prev_diary_id': diary_page.prev_diary_id,
-                            'diary_id': diary_id
+                            'diary_id': diary_id,
                         }
                         dump_process[source] += 1
                 else:
@@ -403,10 +405,11 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
                         print('Interval changes to {} sec.'.format(DiaryDumpApp.INTERVAL_LONG))
                         interval = DiaryDumpApp.INTERVAL_LONG
 
-                print('diary id {} ({}:{}) processed. ({})'.format(diary_id,
-                                                                   page_info['date'].strftime('%Y-%m-%d'),
-                                                                   page_info['title'],
-                                                                   source))
+                print(
+                    'diary id {} ({}:{}) processed. ({})'.format(
+                        diary_id, page_info['date'].strftime('%Y-%m-%d'), page_info['title'], source
+                    )
+                )
 
                 if source != 'page_info':
                     self._page_info[diary_id] = page_info
@@ -436,7 +439,7 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
 
 
 def main():
-    '''エントリポイント'''
+    """エントリポイント"""
 
     the_app = DiaryDumpApp()
     result = the_app.run()
@@ -444,5 +447,5 @@ def main():
     sys.exit(result)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

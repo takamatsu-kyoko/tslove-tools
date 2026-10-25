@@ -1,4 +1,4 @@
-'''ダンプアプリケーションの基本的な機能を提供します'''
+"""ダンプアプリケーションの基本的な機能を提供します"""
 
 import datetime
 import getpass
@@ -11,8 +11,9 @@ from tslove.core.web import TsLoveWeb
 from tslove.core.exception import WebAccessError
 
 
-class DumpApp():  # pylint: disable=R0903
-    '''ダンプアプリケーションの基底クラス'''
+class DumpApp:  # pylint: disable=R0903
+    """ダンプアプリケーションの基底クラス"""
+
     STYLESHEET_URL_PATTERN = re.compile(r'url\((?P<path>.+)\)')
 
     def __init__(self) -> None:
@@ -21,12 +22,12 @@ class DumpApp():  # pylint: disable=R0903
         self._page_info: dict = {}
 
     def _login(self) -> bool:
-        '''ログイン処理を行います
+        """ログイン処理を行います
 
         self._config の show_session_id, php_session_id, echo_password 属性を利用します
 
         :return: ログインに成功した場合 True
-        '''
+        """
         assert hasattr(self._config, 'show_session_id')
         assert hasattr(self._config, 'php_session_id')
         assert hasattr(self._config, 'echo_password')
@@ -54,12 +55,12 @@ class DumpApp():  # pylint: disable=R0903
         return False
 
     def _prepare_directories(self) -> None:
-        '''出力先のディレクトリを用意します
+        """出力先のディレクトリを用意します
 
         self._config の output_path 属性を利用します
 
         :raises: OSError ディレクトリの作成に失敗した場合
-        '''
+        """
         assert hasattr(self._config, 'output_path')
 
         directories = self._config.output_path.values()
@@ -72,7 +73,7 @@ class DumpApp():  # pylint: disable=R0903
             raise err
 
     def _dump_image(self, src_path: str, dst_path: str, overwrite=False) -> None:
-        '''画像を取得します
+        """画像を取得します
 
         img.phpを利用する場合オリジナルの画像サイズで取得するためにパラメータを組み立て直しています
 
@@ -82,7 +83,7 @@ class DumpApp():  # pylint: disable=R0903
         :raise: WebAccessError 画像の取得に失敗した場合
         :raise: OSError 画像の保存に失敗した場合
         :raise: ValueError 取得元のパスからファイル名を取得出来なかった場合
-        '''
+        """
         pattern = re.compile(r'filename=(?P<filename>[^&;?]+)')
 
         if os.path.exists(dst_path) and overwrite is False:
@@ -91,9 +92,7 @@ class DumpApp():  # pylint: disable=R0903
         if 'img.php' in src_path:
             result = pattern.search(src_path)
             if result:
-                params = {'m': 'pc',
-                          'filename': result.group('filename')
-                          }
+                params = {'m': 'pc', 'filename': result.group('filename')}
                 image = self._web.get_image('img.php', params)
             else:
                 raise ValueError('Src filename not match')
@@ -104,7 +103,7 @@ class DumpApp():  # pylint: disable=R0903
 
     @staticmethod
     def _find_filename_from_src_path(path: str) -> str:
-        '''imgタグやスタイルシート内のパスからファイル名を見つけます
+        """imgタグやスタイルシート内のパスからファイル名を見つけます
 
         pathにimg_skin.phpが含まれる場合はクエリパラメータからimage_filenameの値を
         pathにimg.phpが含まれる場合はクエリパラメータからfilenameの値を抜き出します
@@ -112,7 +111,7 @@ class DumpApp():  # pylint: disable=R0903
 
         :param path: パス
         :return: ファイル名
-        '''
+        """
         img_pattern = re.compile(r'./img\.php.+filename=(?P<filename>[^&;?]+)')
         img_skin_pattern = re.compile(r'./img_skin\.php.+image_filename=(?P<filename>[^&;?]+)')
 
@@ -127,13 +126,13 @@ class DumpApp():  # pylint: disable=R0903
         return os.path.basename(path)
 
     def _dump_stylesheet(self) -> None:
-        '''スタイルシートをダンプします
+        """スタイルシートをダンプします
 
         self._config の output_path 属性を利用します
 
         :raises: WebAccessError スタイルシート本文の取得に失敗した場合
         :raises: OSError ファイルの出力に失敗した場合
-        '''
+        """
         assert hasattr(self._config, 'output_path')
 
         file_name = os.path.join(self._config.output_path['stylesheet'], 'tslove.css')
@@ -163,13 +162,13 @@ class DumpApp():  # pylint: disable=R0903
             raise err
 
     def __create_stylesheet_image_path_list(self, stylesheet: str) -> List[Tuple[str, str]]:
-        '''スタイルシート中の画像の取得元・保存先のリストを作成します
+        """スタイルシート中の画像の取得元・保存先のリストを作成します
 
         self._config の output_path 属性を利用します
 
         :param stylesheet: スタイルシートの内容
         :return: 画像の取得元・保存先のタプルのリスト
-        '''
+        """
         assert hasattr(self._config, 'output_path')
 
         output_path = self._config.output_path['stylesheet']
@@ -187,7 +186,7 @@ class DumpApp():  # pylint: disable=R0903
         return path_list
 
     def _fetch_scripts(self, script_paths: set, overwrite=False) -> None:
-        '''スクリプトを取得します
+        """スクリプトを取得します
 
         self._config の output_path 属性を利用します
 
@@ -195,14 +194,17 @@ class DumpApp():  # pylint: disable=R0903
 
         :params script_paths: 取得するスクリプトのパスの集合
         :param overwrite: スクリプトを上書きする場合 True
-        '''
+        """
         assert hasattr(self._config, 'output_path')
 
         output_path = self._config.output_path['script']
 
         for path in script_paths:
-
-            if path.startswith('./js/prototype.js') or path.startswith('./js/Selection.js') or path == './js/comment.js':
+            if (
+                path.startswith('./js/prototype.js')
+                or path.startswith('./js/Selection.js')
+                or path == './js/comment.js'
+            ):
                 continue
 
             filename = os.path.join(output_path, os.path.basename(path))
@@ -219,12 +221,12 @@ class DumpApp():  # pylint: disable=R0903
                 continue
 
     def _load_page_info(self) -> None:
-        '''ページ情報ファイルを読み込みます
+        """ページ情報ファイルを読み込みます
 
         self._config の output_path 属性を利用します
 
         :raises: OSError ファイルの読み込みに失敗した場合
-        '''
+        """
         assert hasattr(self._config, 'output_path')
 
         def convert_datetime(dct):
@@ -245,12 +247,12 @@ class DumpApp():  # pylint: disable=R0903
             self._page_info = {}
 
     def _save_page_info(self) -> None:
-        '''ページ情報ファイルを保存します
+        """ページ情報ファイルを保存します
 
         self._config の output_path 属性を利用します
 
         :raises: OSError ファイルの書き込みに失敗した場合
-        '''
+        """
         assert hasattr(self._config, 'output_path')
 
         page_info_path = os.path.join(self._config.output_path['tools'], 'page_info.json')
