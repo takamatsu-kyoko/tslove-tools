@@ -219,6 +219,7 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
                 if (
                     src.startswith('./js/prototype.js')
                     or src.startswith('./js/Selection.js')
+                    or src.startswith('https://www.googletagmanager.com/')
                     or src == './js/comment.js'
                 ):
                     script_tag.decompose()

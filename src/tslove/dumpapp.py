@@ -203,6 +203,7 @@ class DumpApp:  # pylint: disable=R0903
             if (
                 path.startswith('./js/prototype.js')
                 or path.startswith('./js/Selection.js')
+                or path.startswith('https://www.googletagmanager.com/')
                 or path == './js/comment.js'
             ):
                 continue
