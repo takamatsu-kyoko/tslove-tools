@@ -389,7 +389,7 @@ class DiaryDumpApp(DumpApp):  # pylint: disable=R0903
                     try:
                         page_info = self._dump_diary(diary_id, file_name)
                     except (WebAccessError, OSError) as err:
-                        print('Processing diary id {} failed. {}'.format(diary_id, err))
+                        print('Processing diary id {} failed. {}'.format(diary_id, err.__cause__))
                         return 1
 
                     dump_process[source] += 1
