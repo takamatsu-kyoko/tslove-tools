@@ -98,6 +98,9 @@ class TsLoveWeb:
                 self.__total_retries += 1
             try:
                 response = request()
+            except requests.Timeout:
+                self.__retry_count += 1
+                continue
             except requests.RequestException as err:
                 raise RequestError from err
             if response.ok:
